@@ -280,6 +280,37 @@ func GetUserProfile(c *gin.Context) {
 	c.JSON(http.StatusOK, user)
 }
 
+func GetUserByUsername (c *gin.Context) {
+	username := c.Param("username")
+	if username == "" {
+		utils.LogError(errors.New("username manquant"), "Username parameter is missing in GetUserByUsername")
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Username parameter is required"})
+		return
+	}
+
+	var user models.User
+	result := db.DB.Where("user_name = ?", username).First(&user)
+	if result.Error != nil {
+		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+			utils.LogError(result.Error, "User not found in GetUserByUsername")
+			c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+			return
+		}
+		utils.LogError(result.Error, "Error when retrieving user by username in GetUserByUsername")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error retrieving user: " + result.Error.Error()})
+		return
+	}
+
+	user.Password = ""
+
+	userID, exists := c.Get("user_id")
+	if !exists {
+		userID = "0"
+	}
+	utils.LogSuccessWithUser(userID, "User retrieved successfully by username in GetUserByUsername")
+	c.JSON(http.StatusOK, user)
+}
+
 // UserStatsResponse représente la réponse de statistiques d'utilisateurs
 type UserStatsResponse struct {
 	Period string `json:"period"`
