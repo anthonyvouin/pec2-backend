@@ -52,9 +52,8 @@ func CreatePost(c *gin.Context) {
 		isFree = false
 	default:
 		isFree = false
-
 	}
-
+	
 	categoryIDs := c.PostFormArray("categories")
 	if len(categoryIDs) == 0 {
 		categoriesStr := c.Request.FormValue("categories")
@@ -66,15 +65,15 @@ func CreatePost(c *gin.Context) {
 			}
 		}
 	}
-
+	
 	post := models.Post{
 		UserID: userID.(string),
 		Name:   name,
 		IsFree: isFree,
 		Enable: true,
 	}
-
-	file, err := c.FormFile("file")
+	
+	file, err := c.FormFile("postPicture")
 	if err == nil && file != nil {
 		imageURL, err := utils.UploadImage(file, "post_pictures", "post")
 		if err != nil {
@@ -161,7 +160,6 @@ func GetAllPosts(c *gin.Context) {
 		// Compter le nombre de likes
 		var likesCount int64
 		db.DB.Model(&models.Like{}).Where("post_id = ?", post.ID).Count(&likesCount)
-		fmt.Println("Likes count for post ID", post.ID, ":", likesCount)
 		// Compter le nombre de commentaires
 		var commentsCount int64
 		db.DB.Model(&models.Comment{}).Where("post_id = ?", post.ID).Count(&commentsCount)

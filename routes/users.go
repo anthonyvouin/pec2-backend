@@ -28,5 +28,6 @@ func UsersRoutes(r *gin.Engine) {
 		userRoutes.PUT("/password", users.UpdatePassword)
 		userRoutes.PUT("/profile", users.UpdateUserProfile)
 		userRoutes.GET("/profile", users.GetUserProfile)
+		userRoutes.GET("/:username", users.GetUserByUsername)
 	}
 }
