@@ -29,5 +29,6 @@ func UsersRoutes(r *gin.Engine) {
 		userRoutes.PUT("/profile", users.UpdateUserProfile)
 		userRoutes.GET("/profile", users.GetUserProfile)
 		userRoutes.GET("/:username", users.GetUserByUsername)
+		userRoutes.POST(":id/follow", users.FollowUser)
 	}
 }

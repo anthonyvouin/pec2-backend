@@ -2223,6 +2223,61 @@ paths:
       summary: Get all users (Admin)
       tags:
       - users
+  /users/{id}/follow:
+    post:
+      consumes:
+      - application/json
+      description: Allows an authenticated user to follow another user
+      parameters:
+      - description: ID of the user to follow
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 'message: Follow successful'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: 'error: Bad request'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: 'error: Unauthorized'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: 'error: User not found'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "409":
+          description: 'error: Already followed'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: 'error: Server error'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Follow a user
+      tags:
+      - users
   /users/password:
     put:
       consumes:
