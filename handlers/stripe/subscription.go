@@ -95,6 +95,9 @@ func CreateSubscriptionCheckoutSession(c *gin.Context) {
 		payer.StripeCustomerId = cust.ID
 	}
 
+	redirectSucces := os.Getenv("STRIPE_REDIRECT_SUCCESS")
+	redirectError := os.Getenv("STRIPE_REDIRECT_ERROR")
+
 	params := &stripe.CheckoutSessionParams{
 		Customer:           stripe.String(payer.StripeCustomerId),
 		PaymentMethodTypes: stripe.StringSlice([]string{"card"}),
@@ -105,8 +108,8 @@ func CreateSubscriptionCheckoutSession(c *gin.Context) {
 				Quantity: stripe.Int64(1),
 			},
 		},
-		SuccessURL:        stripe.String("https://tonsite.com/success"),
-		CancelURL:         stripe.String("https://tonsite.com/cancel"),
+		SuccessURL:        stripe.String(redirectSucces + "?creator=" + creator.UserName),
+		CancelURL:         stripe.String(redirectError + "?creator=" + creator.UserName),
 		ClientReferenceID: stripe.String(contentCreatorId),
 	}
 
@@ -133,14 +136,14 @@ func CreateSubscriptionCheckoutSession(c *gin.Context) {
 // @Failure 403 {object} map[string]string "error: You are not authorized to cancel this subscription"
 // @Failure 404 {object} map[string]string "error: Subscription not found"
 // @Failure 500 {object} map[string]string "error: Error when canceling the Stripe subscription"
-// @Router /subscriptions/{subscriptionId} [delete]
+// @Router /subscriptions/{creatorId} [delete]
 func CancelSubscription(c *gin.Context) {
 	stripe.Key = os.Getenv("STRIPE_SECRET_KEY")
-	subscriptionId := c.Param("subscriptionId")
+	creatorId := c.Param("creatorId")
 
 	// Validation de l'UUID
-	if _, err := uuid.Parse(subscriptionId); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid subscription ID"})
+	if _, err := uuid.Parse(creatorId); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid creator ID"})
 		return
 	}
 
@@ -152,7 +155,7 @@ func CancelSubscription(c *gin.Context) {
 	}
 
 	var subscription models.Subscription
-	err := db.DB.First(&subscription, "id = ?", subscriptionId).Error
+	err := db.DB.First(&subscription, "content_creator_id = ? AND user_id = ? AND status = ?", creatorId, userID, "ACTIVE").Error
 	if err != nil {
 		utils.LogErrorWithUser(userID, err, "Subscription not found dans CancelSubscription")
 		c.JSON(http.StatusNotFound, gin.H{"error": "Subscription not found"})
@@ -182,7 +185,7 @@ func CancelSubscription(c *gin.Context) {
 	}
 
 	utils.LogSuccessWithUser(userID, "Abonnement annulé avec succès dans CancelSubscription")
-	c.JSON(http.StatusOK, gin.H{"message": "Subscription canceled successfully"})
+	c.JSON(http.StatusOK, subscription)
 }
 
 // GetUserSubscriptions get all the subscriptions (active, canceled, history) of the connected user

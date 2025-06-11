@@ -280,7 +280,7 @@ func GetUserProfile(c *gin.Context) {
 	c.JSON(http.StatusOK, user)
 }
 
-func GetUserByUsername (c *gin.Context) {
+func GetUserByUsername(c *gin.Context) {
 	username := c.Param("username")
 	if username == "" {
 		utils.LogError(errors.New("username manquant"), "Username parameter is missing in GetUserByUsername")
@@ -288,8 +288,8 @@ func GetUserByUsername (c *gin.Context) {
 		return
 	}
 
-	var user models.User
-	result := db.DB.Where("user_name = ?", username).First(&user)
+	var searchUser models.User
+	result := db.DB.Where("user_name = ?", username).First(&searchUser)
 	if result.Error != nil {
 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 			utils.LogError(result.Error, "User not found in GetUserByUsername")
@@ -301,14 +301,70 @@ func GetUserByUsername (c *gin.Context) {
 		return
 	}
 
-	user.Password = ""
+	searchUser.Password = ""
 
 	userID, exists := c.Get("user_id")
 	if !exists {
 		userID = "0"
 	}
+
+	var subs []models.Subscription
+	today := time.Now()
+
+	resultSubscription := db.DB.
+		Where("user_id = ? AND content_creator_id = ? AND end_date > ?", userID, searchUser.ID, today).
+		Find(&subs)
+
+	if resultSubscription.Error != nil {
+
+	}
+
+	var lastActive *models.Subscription
+	var lastCanceled *models.Subscription
+
+	for i := range subs {
+		sub := &subs[i]
+
+		if sub.Status == "ACTIVE" {
+			if lastActive == nil || sub.EndDate.After(*lastActive.EndDate) {
+				lastActive = sub
+			}
+		} else if sub.Status == "CANCELED" {
+			if lastCanceled == nil || sub.EndDate.After(*lastCanceled.EndDate) {
+				lastCanceled = sub
+			}
+		}
+	}
+
+	var lastSubscription *models.Subscription
+	if lastActive != nil {
+		lastSubscription = lastActive
+	} else if lastCanceled != nil {
+		lastSubscription = lastCanceled
+	} else {
+		lastSubscription = nil
+	}
+
+	isSubscriber := len(subs) > 0
+
 	utils.LogSuccessWithUser(userID, "User retrieved successfully by username in GetUserByUsername")
-	c.JSON(http.StatusOK, user)
+	c.JSON(http.StatusOK, gin.H{
+		"user":                     searchUser,
+		"isSubscriberToSearchUser": isSubscriber,
+		"canceledSubscription": func() *bool {
+			if lastSubscription == nil {
+				return nil
+			}
+			b := lastSubscription.Status == models.SubscriptionCanceled
+			return &b
+		}(),
+		"subscriberUntil": func() *time.Time {
+			if lastSubscription == nil {
+				return nil
+			}
+			return lastSubscription.EndDate
+		}(),
+	})
 }
 
 // UserStatsResponse représente la réponse de statistiques d'utilisateurs
