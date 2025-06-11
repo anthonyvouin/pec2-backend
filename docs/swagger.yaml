@@ -2223,6 +2223,172 @@ paths:
       summary: Get all users (Admin)
       tags:
       - users
+  /users/{id}/follow:
+    delete:
+      consumes:
+      - application/json
+      description: Permet à un utilisateur authentifié d'arrêter de suivre un autre
+        utilisateur
+      parameters:
+      - description: ID de l'utilisateur à unfollow
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 'message: Unfollow réussi'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: 'error: Mauvaise requête'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: 'error: Non autorisé'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: 'error: Utilisateur non trouvé ou follow non existant'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: 'error: Erreur serveur'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Unfollow un utilisateur
+      tags:
+      - users
+    post:
+      consumes:
+      - application/json
+      description: Allows an authenticated user to follow another user
+      parameters:
+      - description: ID of the user to follow
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 'message: Follow successful'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: 'error: Bad request'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: 'error: Unauthorized'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: 'error: User not found'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "409":
+          description: 'error: Already followed'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: 'error: Server error'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Follow a user
+      tags:
+      - users
+  /users/followers:
+    get:
+      consumes:
+      - application/json
+      description: Liste tous les utilisateurs qui suivent l'utilisateur authentifié
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Liste des followers
+          schema:
+            items:
+              $ref: '#/definitions/models.User'
+            type: array
+        "401":
+          description: 'error: Non autorisé'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: 'error: Erreur serveur'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Liste des followers
+      tags:
+      - users
+  /users/followings:
+    get:
+      consumes:
+      - application/json
+      description: Liste tous les utilisateurs que l'utilisateur authentifié suit
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Liste des utilisateurs suivis
+          schema:
+            items:
+              $ref: '#/definitions/models.User'
+            type: array
+        "401":
+          description: 'error: Non autorisé'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: 'error: Erreur serveur'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Liste des utilisateurs suivis
+      tags:
+      - users
   /users/password:
     put:
       consumes:

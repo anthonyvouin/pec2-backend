@@ -783,3 +783,182 @@ func ConfirmPasswordReset(c *gin.Context) {
 	utils.LogSuccessWithUser(userID, "Password reset successfully in ConfirmPasswordReset")
 	c.JSON(http.StatusOK, gin.H{"message": "Password reset"})
 }
+
+// @Summary Follow a user
+// @Description Allows an authenticated user to follow another user
+// @Tags users
+// @Accept json
+// @Produce json
+// @Param id path string true "ID of the user to follow"
+// @Security BearerAuth
+// @Success 200 {object} map[string]string "message: Follow successful"
+// @Failure 400 {object} map[string]string "error: Bad request"
+// @Failure 401 {object} map[string]string "error: Unauthorized"
+// @Failure 404 {object} map[string]string "error: User not found"
+// @Failure 409 {object} map[string]string "error: Already followed"
+// @Failure 500 {object} map[string]string "error: Server error"
+// @Router /users/{id}/follow [post]
+func FollowUser(c *gin.Context) {
+	followerID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+
+	followedID := c.Param("id")
+	if followedID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "User to follow ID is missing"})
+		return
+	}
+	if followerID == followedID {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "You cannot follow yourself"})
+		return
+	}
+
+	var user models.User
+	if err := db.DB.First(&user, "id = ?", followedID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "User to follow not found"})
+		return
+	}
+
+	var existingFollow models.UserFollow
+	err := db.DB.Where("follower_id = ? AND followed_id = ?", followerID, followedID).First(&existingFollow).Error
+	if err == nil {
+		c.JSON(http.StatusConflict, gin.H{"error": "You already follow this user"})
+		return
+	}
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error when checking the follow"})
+		return
+	}
+
+	follow := models.UserFollow{
+		FollowerID: followerID.(string),
+		FollowedID: followedID,
+	}
+	if err := db.DB.Create(&follow).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error when following the user"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "User followed successfully"})
+}
+
+// @Summary Unfollow a user
+// @Description Allows an authenticated user to unfollow another user
+// @Tags users
+// @Accept json
+// @Produce json
+// @Param id path string true "ID of the user to unfollow"
+// @Security BearerAuth
+// @Success 200 {object} map[string]string "message: Unfollow successful"
+// @Failure 400 {object} map[string]string "error: Bad request"
+// @Failure 401 {object} map[string]string "error: Unauthorized"
+// @Failure 404 {object} map[string]string "error: User not found or follow does not exist"
+// @Failure 500 {object} map[string]string "error: Server error"
+// @Router /users/{id}/follow [delete]
+func UnfollowUser(c *gin.Context) {
+	followerID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+
+	followedID := c.Param("id")
+	if followedID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "User to unfollow ID is missing"})
+		return
+	}
+	if followerID == followedID {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "You cannot unfollow yourself"})
+		return
+	}
+
+	var follow models.UserFollow
+	err := db.DB.Where("follower_id = ? AND followed_id = ?", followerID, followedID).First(&follow).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Follow relationship does not exist"})
+		return
+	}
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error when checking the follow"})
+		return
+	}
+
+	if err := db.DB.Delete(&follow).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error when unfollowing the user"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "User unfollowed successfully"})
+}
+
+// @Summary List of users followed
+// @Description List all users that the authenticated user follows
+// @Tags users
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {array} models.User "List of users followed"
+// @Failure 401 {object} map[string]string "error: Unauthorized"
+// @Failure 500 {object} map[string]string "error: Server error"
+// @Router /users/followings [get]
+func GetMyFollowings(c *gin.Context) {
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+
+	var follows []models.UserFollow
+	if err := db.DB.Where("follower_id = ?", userID).Find(&follows).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error fetching followings"})
+		return
+	}
+
+	var users []models.User
+	for _, follow := range follows {
+		var user models.User
+		if err := db.DB.Where("id = ?", follow.FollowedID).First(&user).Error; err == nil {
+			user.Password = ""
+			users = append(users, user)
+		}
+	}
+
+	c.JSON(http.StatusOK, users)
+}
+
+// @Summary Liste des followers
+// @Description Liste tous les utilisateurs qui suivent l'utilisateur authentifié
+// @Tags users
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {array} models.User "List of followers"
+// @Failure 401 {object} map[string]string "error: Unauthorized"
+// @Failure 500 {object} map[string]string "error: Server error"
+// @Router /users/followers [get]
+func GetMyFollowers(c *gin.Context) {
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+
+	var follows []models.UserFollow
+	if err := db.DB.Where("followed_id = ?", userID).Find(&follows).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error fetching followers"})
+		return
+	}
+
+	var users []models.User
+	for _, follow := range follows {
+		var user models.User
+		if err := db.DB.Where("id = ?", follow.FollowerID).First(&user).Error; err == nil {
+			user.Password = ""
+			users = append(users, user)
+		}
+	}
+
+	c.JSON(http.StatusOK, users)
+}
