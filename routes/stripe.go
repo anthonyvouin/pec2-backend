@@ -12,7 +12,7 @@ func StripeRoutes(r *gin.Engine) {
 	subscriptionRoutes.Use(middleware.JWTAuth())
 	{
 		subscriptionRoutes.POST("/checkout/:contentCreatorId", stripe.CreateSubscriptionCheckoutSession)
-		subscriptionRoutes.DELETE("/:subscriptionId", stripe.CancelSubscription)
+		subscriptionRoutes.DELETE("/:creatorId", stripe.CancelSubscription)
 		subscriptionRoutes.GET("/", stripe.GetUserSubscriptions)
 		subscriptionRoutes.GET("/:subscriptionId", stripe.GetSubscriptionDetail)
 		subscriptionRoutes.GET("/revenue", middleware.AdminAuth(), stripe.GetTotalRevenue)
