@@ -962,3 +962,39 @@ func GetMyFollowers(c *gin.Context) {
 
 	c.JSON(http.StatusOK, users)
 }
+
+// @Summary Number of followers and followings
+// @Description Return the number of followers and followings for a given user
+// @Tags users
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "ID of the user"
+// @Success 200 {object} map[string]interface{} "userId, followers, followings"
+// @Failure 404 {object} map[string]string "error: User not found"
+// @Failure 500 {object} map[string]string "error: Server error"
+// @Router /users/id/{id}/follow-counts [get]
+func GetUserFollowCounts(c *gin.Context) {
+	userID := c.Param("id")
+	if userID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "User ID is required"})
+		return
+	}
+
+	var user models.User
+	if err := db.DB.First(&user, "id = ?", userID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		return
+	}
+
+	var followersCount int64
+	var followingsCount int64
+	db.DB.Model(&models.UserFollow{}).Where("followed_id = ?", userID).Count(&followersCount)
+	db.DB.Model(&models.UserFollow{}).Where("follower_id = ?", userID).Count(&followingsCount)
+
+	c.JSON(http.StatusOK, gin.H{
+		"userId":     userID,
+		"followers":  followersCount,
+		"followings": followingsCount,
+	})
+}

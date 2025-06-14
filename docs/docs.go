@@ -2334,69 +2334,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/subscriptions/{subscriptionId}": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Return the detailed information of a subscription",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "subscriptions"
-                ],
-                "summary": "Details of a subscription",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "ID of the subscription",
-                        "name": "subscriptionId",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/models.Subscription"
-                        }
-                    },
-                    "401": {
-                        "description": "error: Unauthorized",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    },
-                    "403": {
-                        "description": "error: You are not authorized to view this subscription",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    },
-                    "404": {
-                        "description": "error: Subscription not found",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    }
-                }
-            },
+        "/subscriptions/{creatorId}": {
             "delete": {
                 "security": [
                     {
@@ -2462,6 +2400,70 @@ const docTemplate = `{
                     },
                     "500": {
                         "description": "error: Error when canceling the Stripe subscription",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/subscriptions/{subscriptionId}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Return the detailed information of a subscription",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "subscriptions"
+                ],
+                "summary": "Details of a subscription",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID of the subscription",
+                        "name": "subscriptionId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.Subscription"
+                        }
+                    },
+                    "401": {
+                        "description": "error: Unauthorized",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "error: You are not authorized to view this subscription",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "error: Subscription not found",
                         "schema": {
                             "type": "object",
                             "additionalProperties": {
@@ -2548,7 +2550,7 @@ const docTemplate = `{
                 "summary": "Liste des followers",
                 "responses": {
                     "200": {
-                        "description": "Liste des followers",
+                        "description": "List of followers",
                         "schema": {
                             "type": "array",
                             "items": {
@@ -2557,7 +2559,7 @@ const docTemplate = `{
                         }
                     },
                     "401": {
-                        "description": "error: Non autorisé",
+                        "description": "error: Unauthorized",
                         "schema": {
                             "type": "object",
                             "additionalProperties": {
@@ -2566,7 +2568,7 @@ const docTemplate = `{
                         }
                     },
                     "500": {
-                        "description": "error: Erreur serveur",
+                        "description": "error: Server error",
                         "schema": {
                             "type": "object",
                             "additionalProperties": {
@@ -2584,7 +2586,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Liste tous les utilisateurs que l'utilisateur authentifié suit",
+                "description": "List all users that the authenticated user follows",
                 "consumes": [
                     "application/json"
                 ],
@@ -2594,10 +2596,10 @@ const docTemplate = `{
                 "tags": [
                     "users"
                 ],
-                "summary": "Liste des utilisateurs suivis",
+                "summary": "List of users followed",
                 "responses": {
                     "200": {
-                        "description": "Liste des utilisateurs suivis",
+                        "description": "List of users followed",
                         "schema": {
                             "type": "array",
                             "items": {
@@ -2606,7 +2608,7 @@ const docTemplate = `{
                         }
                     },
                     "401": {
-                        "description": "error: Non autorisé",
+                        "description": "error: Unauthorized",
                         "schema": {
                             "type": "object",
                             "additionalProperties": {
@@ -2615,7 +2617,63 @@ const docTemplate = `{
                         }
                     },
                     "500": {
-                        "description": "error: Erreur serveur",
+                        "description": "error: Server error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/users/id/{id}/follow-counts": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Return the number of followers and followings for a given user",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "users"
+                ],
+                "summary": "Number of followers and followings",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID of the user",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "userId, followers, followings",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "404": {
+                        "description": "error: User not found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "error: Server error",
                         "schema": {
                             "type": "object",
                             "additionalProperties": {
@@ -3232,7 +3290,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Permet à un utilisateur authentifié d'arrêter de suivre un autre utilisateur",
+                "description": "Allows an authenticated user to unfollow another user",
                 "consumes": [
                     "application/json"
                 ],
@@ -3242,11 +3300,11 @@ const docTemplate = `{
                 "tags": [
                     "users"
                 ],
-                "summary": "Unfollow un utilisateur",
+                "summary": "Unfollow a user",
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "ID de l'utilisateur à unfollow",
+                        "description": "ID of the user to unfollow",
                         "name": "id",
                         "in": "path",
                         "required": true
@@ -3254,7 +3312,7 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "message: Unfollow réussi",
+                        "description": "message: Unfollow successful",
                         "schema": {
                             "type": "object",
                             "additionalProperties": {
@@ -3263,7 +3321,7 @@ const docTemplate = `{
                         }
                     },
                     "400": {
-                        "description": "error: Mauvaise requête",
+                        "description": "error: Bad request",
                         "schema": {
                             "type": "object",
                             "additionalProperties": {
@@ -3272,7 +3330,7 @@ const docTemplate = `{
                         }
                     },
                     "401": {
-                        "description": "error: Non autorisé",
+                        "description": "error: Unauthorized",
                         "schema": {
                             "type": "object",
                             "additionalProperties": {
@@ -3281,7 +3339,7 @@ const docTemplate = `{
                         }
                     },
                     "404": {
-                        "description": "error: Utilisateur non trouvé ou follow non existant",
+                        "description": "error: User not found or follow does not exist",
                         "schema": {
                             "type": "object",
                             "additionalProperties": {
@@ -3290,7 +3348,7 @@ const docTemplate = `{
                         }
                     },
                     "500": {
-                        "description": "error: Erreur serveur",
+                        "description": "error: Server error",
                         "schema": {
                             "type": "object",
                             "additionalProperties": {
