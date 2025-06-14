@@ -1954,7 +1954,7 @@ paths:
       summary: List the user's subscriptions
       tags:
       - subscriptions
-  /subscriptions/{subscriptionId}:
+  /subscriptions/{creatorId}:
     delete:
       consumes:
       - application/json
@@ -2003,6 +2003,7 @@ paths:
       summary: Cancel a subscription
       tags:
       - subscriptions
+  /subscriptions/{subscriptionId}:
     get:
       consumes:
       - application/json
@@ -2227,10 +2228,9 @@ paths:
     delete:
       consumes:
       - application/json
-      description: Permet à un utilisateur authentifié d'arrêter de suivre un autre
-        utilisateur
+      description: Allows an authenticated user to unfollow another user
       parameters:
-      - description: ID de l'utilisateur à unfollow
+      - description: ID of the user to unfollow
         in: path
         name: id
         required: true
@@ -2239,38 +2239,38 @@ paths:
       - application/json
       responses:
         "200":
-          description: 'message: Unfollow réussi'
+          description: 'message: Unfollow successful'
           schema:
             additionalProperties:
               type: string
             type: object
         "400":
-          description: 'error: Mauvaise requête'
+          description: 'error: Bad request'
           schema:
             additionalProperties:
               type: string
             type: object
         "401":
-          description: 'error: Non autorisé'
+          description: 'error: Unauthorized'
           schema:
             additionalProperties:
               type: string
             type: object
         "404":
-          description: 'error: Utilisateur non trouvé ou follow non existant'
+          description: 'error: User not found or follow does not exist'
           schema:
             additionalProperties:
               type: string
             type: object
         "500":
-          description: 'error: Erreur serveur'
+          description: 'error: Server error'
           schema:
             additionalProperties:
               type: string
             type: object
       security:
       - BearerAuth: []
-      summary: Unfollow un utilisateur
+      summary: Unfollow a user
       tags:
       - users
     post:
@@ -2336,19 +2336,19 @@ paths:
       - application/json
       responses:
         "200":
-          description: Liste des followers
+          description: List of followers
           schema:
             items:
               $ref: '#/definitions/models.User'
             type: array
         "401":
-          description: 'error: Non autorisé'
+          description: 'error: Unauthorized'
           schema:
             additionalProperties:
               type: string
             type: object
         "500":
-          description: 'error: Erreur serveur'
+          description: 'error: Server error'
           schema:
             additionalProperties:
               type: string
@@ -2362,31 +2362,67 @@ paths:
     get:
       consumes:
       - application/json
-      description: Liste tous les utilisateurs que l'utilisateur authentifié suit
+      description: List all users that the authenticated user follows
       produces:
       - application/json
       responses:
         "200":
-          description: Liste des utilisateurs suivis
+          description: List of users followed
           schema:
             items:
               $ref: '#/definitions/models.User'
             type: array
         "401":
-          description: 'error: Non autorisé'
+          description: 'error: Unauthorized'
           schema:
             additionalProperties:
               type: string
             type: object
         "500":
-          description: 'error: Erreur serveur'
+          description: 'error: Server error'
           schema:
             additionalProperties:
               type: string
             type: object
       security:
       - BearerAuth: []
-      summary: Liste des utilisateurs suivis
+      summary: List of users followed
+      tags:
+      - users
+  /users/id/{id}/follow-counts:
+    get:
+      consumes:
+      - application/json
+      description: Return the number of followers and followings for a given user
+      parameters:
+      - description: ID of the user
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: userId, followers, followings
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: 'error: User not found'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: 'error: Server error'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Number of followers and followings
       tags:
       - users
   /users/password:
