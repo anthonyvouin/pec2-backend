@@ -46,6 +46,7 @@ func InitDB() {
 		&models.PrivateMessage{},
 		&models.Subscription{},
 		&models.SubscriptionPayment{},
+		&models.UserFollow{},
 	)
 	if err != nil {
 		utils.LogError(err, "Error migrating database")

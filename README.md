@@ -51,3 +51,6 @@ go test ./handlers/auth -v
 go test ./...
 ```
 
+``` bash
+stripe listen --forward-to http://localhost:8080/stripe/webhook
+```
