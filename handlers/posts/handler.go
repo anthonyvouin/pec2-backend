@@ -53,15 +53,20 @@ func CreatePost(c *gin.Context) {
 	default:
 		isFree = false
 	}
+	
 
-	categoryIDs := c.PostFormArray("categories")
-	if len(categoryIDs) == 0 {
-		categoriesStr := c.Request.FormValue("categories")
-		if categoriesStr != "" {
-			if err := json.Unmarshal([]byte(categoriesStr), &categoryIDs); err != nil {
-				utils.LogError(err, "Invalid categories format in CreatePost")
-				c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid categories format: " + err.Error()})
-				return
+	categoriesStr := c.Request.FormValue("categories")
+	fmt.Println("Categories received in CreatePost:", categoriesStr)
+	var categoryIDs []string
+	if categoriesStr != "" {
+		if err := json.Unmarshal([]byte(categoriesStr), &categoryIDs); err != nil {
+			categoryIDs = []string{}
+			cleanStr := strings.Trim(categoriesStr, "[]")
+			for _, id := range strings.Split(cleanStr, ",") {
+				trimmedID := strings.TrimSpace(id)
+				if trimmedID != "" {
+					categoryIDs = append(categoryIDs, trimmedID)
+				}
 			}
 		}
 	}
@@ -124,12 +129,14 @@ func CreatePost(c *gin.Context) {
 }
 
 // @Summary Get all posts
-// @Description Retrieve all posts with optional filtering
+// @Description Retrieve all posts with optional filtering and pagination
 // @Tags posts
 // @Produce json
 // @Param isFree query boolean false "Filter by free posts"
-// @Param category query string false "Filter by category ID"
-// @Success 200 {array} models.PostResponse
+// @Param categories query []string false "Filter by category IDs (can provide multiple)"
+// @Param limit query integer false "Number of items per page (default: 10)"
+// @Param page query integer false "Page number (default: 1)"
+// @Success 200 {object} map[string]interface{} "posts and pagination info"
 // @Failure 500 {object} map[string]string "error: Error message"
 // @Router /posts [get]
 func GetAllPosts(c *gin.Context) {
@@ -148,11 +155,41 @@ func GetAllPosts(c *gin.Context) {
 	// Afficher le user qui a créé le post
 	query = query.Preload("User")
 
-	// Filtre par catégorie
-	if categoryID := c.Query("category"); categoryID != "" {
+	// Filtre par catégories (multiple)
+	print("Categories received in GetAllPosts:", c.QueryArray("categories"))
+	if categories := c.QueryArray("categories"); len(categories) > 0 {
 		query = query.Joins("JOIN post_categories ON posts.id = post_categories.post_id").
-			Where("post_categories.category_id = ?", categoryID)
+			Where("post_categories.category_id IN (?)", categories).
+			Group("posts.id")
 	}
+
+	// Compter le nombre total de posts pour la pagination
+	var total int64
+	if err := query.Model(&models.Post{}).Count(&total).Error; err != nil {
+		utils.LogError(err, "Error counting posts in GetAllPosts")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error counting posts: " + err.Error()})
+		return
+	}
+
+	// Pagination
+	limit := 10
+	if limitParam := c.Query("limit"); limitParam != "" {
+		fmt.Sscanf(limitParam, "%d", &limit)
+		if limit <= 0 {
+			limit = 10
+		}
+	}
+
+	page := 1
+	if pageParam := c.Query("page"); pageParam != "" {
+		fmt.Sscanf(pageParam, "%d", &page)
+		if page <= 0 {
+			page = 1
+		}
+	}
+
+	offset := (page - 1) * limit
+	query = query.Limit(limit).Offset(offset)
 
 	if err := query.Find(&posts).Error; err != nil {
 		utils.LogError(err, "Error retrieving posts in GetAllPosts")
@@ -194,14 +231,23 @@ func GetAllPosts(c *gin.Context) {
 
 		response = append(response, postResponse)
 	}
-
 	userID, exists := c.Get("user_id")
 	if !exists {
 		userID = "0"
 	}
 	utils.LogSuccessWithUser(userID, "Posts retrieved successfully in GetAllPosts")
 	utils.LogSuccess("Posts retrieved successfully in GetAllPosts")
-	c.JSON(http.StatusOK, response)
+
+	// Renvoyer les posts avec les informations de pagination
+	c.JSON(http.StatusOK, gin.H{
+		"posts": response,
+		"pagination": gin.H{
+			"total":       total,
+			"limit":       limit,
+			"page":        page,
+			"total_pages": (total + int64(limit) - 1) / int64(limit),
+		},
+	})
 }
 
 // @Summary Get a post by ID
