@@ -53,7 +53,7 @@ func CreatePost(c *gin.Context) {
 	default:
 		isFree = false
 	}
-	
+
 	categoryIDs := c.PostFormArray("categories")
 	if len(categoryIDs) == 0 {
 		categoriesStr := c.Request.FormValue("categories")
@@ -65,14 +65,14 @@ func CreatePost(c *gin.Context) {
 			}
 		}
 	}
-	
+
 	post := models.Post{
 		UserID: userID.(string),
 		Name:   name,
 		IsFree: isFree,
 		Enable: true,
 	}
-	
+
 	file, err := c.FormFile("postPicture")
 	if err == nil && file != nil {
 		imageURL, err := utils.UploadImage(file, "post_pictures", "post")
@@ -139,6 +139,10 @@ func GetAllPosts(c *gin.Context) {
 	// Filtre pour les posts gratuits/payants
 	if isFree := c.Query("isFree"); isFree != "" {
 		query = query.Where("is_free = ?", isFree == "true")
+	}
+
+	if userIs := c.Query("userIs"); userIs != "" {
+		query = query.Where("user_id = ?", userIs)
 	}
 
 	// Afficher le user qui a créé le post
