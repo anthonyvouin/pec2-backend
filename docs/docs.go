@@ -1016,7 +1016,7 @@ const docTemplate = `{
         },
         "/posts": {
             "get": {
-                "description": "Retrieve all posts with optional filtering",
+                "description": "Retrieve all posts with optional filtering and pagination",
                 "produces": [
                     "application/json"
                 ],
@@ -1032,20 +1032,34 @@ const docTemplate = `{
                         "in": "query"
                     },
                     {
-                        "type": "string",
-                        "description": "Filter by category ID",
-                        "name": "category",
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Filter by category IDs (can provide multiple)",
+                        "name": "categories",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Number of items per page (default: 10)",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page number (default: 1)",
+                        "name": "page",
                         "in": "query"
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "posts and pagination info",
                         "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/models.PostResponse"
-                            }
+                            "type": "object",
+                            "additionalProperties": true
                         }
                     },
                     "500": {
@@ -3998,6 +4012,9 @@ const docTemplate = `{
                 },
                 "updatedAt": {
                     "type": "string"
+                },
+                "user": {
+                    "$ref": "#/definitions/models.User"
                 },
                 "userId": {
                     "type": "string"

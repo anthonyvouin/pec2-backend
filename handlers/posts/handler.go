@@ -53,7 +53,6 @@ func CreatePost(c *gin.Context) {
 	default:
 		isFree = false
 	}
-	
 
 	categoriesStr := c.Request.FormValue("categories")
 	fmt.Println("Categories received in CreatePost:", categoriesStr)
@@ -140,6 +139,7 @@ func CreatePost(c *gin.Context) {
 // @Failure 500 {object} map[string]string "error: Error message"
 // @Router /posts [get]
 func GetAllPosts(c *gin.Context) {
+	userID, exists := c.Get("user_id")
 	var posts []models.Post
 	query := db.DB.Preload("Categories").Order("created_at DESC")
 
@@ -150,6 +150,32 @@ func GetAllPosts(c *gin.Context) {
 
 	if userIs := c.Query("userIs"); userIs != "" {
 		query = query.Where("user_id = ?", userIs)
+	}
+
+	if homeFeed := c.Query("homeFeed"); homeFeed != "" {
+		var userFollow []models.UserFollow
+		errUserFollow := db.DB.
+			Where("follower_id = ?", userID).Find(&userFollow).Error
+		if errUserFollow != nil {
+			utils.LogError(errUserFollow, "Error when getList userFollow id")
+		}
+
+		if len(userFollow) > 0 {
+			var followedIDs []string
+			for _, follow := range userFollow {
+				if follow.FollowedID != "" {
+					followedIDs = append(followedIDs, follow.FollowedID)
+				}
+			}
+
+			if len(followedIDs) > 0 {
+				query = query.Where("user_id IN ?", followedIDs)
+			} else {
+				query = query.Where("1 = 0")
+			}
+		} else {
+			query = query.Where("1 = 0")
+		}
 	}
 
 	// Afficher le user qui a créé le post
@@ -231,7 +257,7 @@ func GetAllPosts(c *gin.Context) {
 
 		response = append(response, postResponse)
 	}
-	userID, exists := c.Get("user_id")
+
 	if !exists {
 		userID = "0"
 	}
