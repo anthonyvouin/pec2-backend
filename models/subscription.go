@@ -14,7 +14,8 @@ const (
 
 type Subscription struct {
 	ID                   string             `json:"id" gorm:"primaryKey;type:uuid;default:gen_random_uuid()"`
-	UserID               string             `json:"userId" gorm:"type:uuid;not null"`
+	UserID               string             `json:"userId" gorm:"column:user_id;type:uuid;references:ID;foreignKey:fk_subscription"`
+	User                 User               `json:"user,omitempty" gorm:"foreignKey:UserID"`
 	ContentCreatorID     string             `json:"contentCreatorId" gorm:"type:uuid;not null"`
 	Status               SubscriptionStatus `json:"status" gorm:"type:varchar(20);default:'PENDING'"`
 	StripeSubscriptionId string             `json:"stripeSubscriptionId"`

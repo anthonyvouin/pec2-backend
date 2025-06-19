@@ -51,6 +51,12 @@ func (User) TableName() string {
 	return "users"
 }
 
+type LiteUser struct {
+	ID             string `json:"id"`
+	UserName       string `json:"username"`
+	ProfilePicture string `json:"profile_picture"`
+}
+
 // UserCreate model for create a user
 // @Description model for create a user
 type UserCreate struct {
@@ -80,10 +86,13 @@ type UserUpdateFormData struct {
 	Sexe         Sexe      `form:"sexe"`
 }
 
-
 type UserFollow struct {
 	ID         string    `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
 	FollowerID string    `gorm:"type:uuid;not null" json:"followerId"`
 	FollowedID string    `gorm:"type:uuid;not null" json:"followedId"`
 	CreatedAt  time.Time `gorm:"autoCreateTime" json:"createdAt"`
+}
+
+type StatisticsUsers struct {
+	Subscribers []User
 }
