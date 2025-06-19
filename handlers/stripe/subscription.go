@@ -142,7 +142,6 @@ func CancelSubscription(c *gin.Context) {
 	stripe.Key = os.Getenv("STRIPE_SECRET_KEY")
 	creatorId := c.Param("creatorId")
 
-	// Validation de l'UUID
 	if _, err := uuid.Parse(creatorId); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid creator ID"})
 		return
@@ -185,7 +184,6 @@ func CancelSubscription(c *gin.Context) {
 		return
 	}
 
-	// Récupération des informations du créateur de contenu et de l'utilisateur
 	var creator models.User
 	var user models.User
 
@@ -194,7 +192,6 @@ func CancelSubscription(c *gin.Context) {
 	} else if err := db.DB.First(&user, "id = ?", userID).Error; err != nil {
 		utils.LogErrorWithUser(userID, err, "Erreur lors de la récupération des infos de l'utilisateur dans CancelSubscription")
 	} else {
-		// Envoi du mail de confirmation d'annulation
 		go mailsmodels.SubscriptionCancellation(user.Email, creator.UserName)
 	}
 
