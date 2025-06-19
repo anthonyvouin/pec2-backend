@@ -8,6 +8,7 @@ import (
 	"pec2-backend/db"
 	"pec2-backend/models"
 	"pec2-backend/utils"
+	mailsmodels "pec2-backend/utils/mails-models"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -182,6 +183,19 @@ func CancelSubscription(c *gin.Context) {
 		utils.LogErrorWithUser(userID, err, "Erreur lors de la mise à jour du statut dans CancelSubscription")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error when updating the subscription status"})
 		return
+	}
+
+	// Récupération des informations du créateur de contenu et de l'utilisateur
+	var creator models.User
+	var user models.User
+
+	if err := db.DB.First(&creator, "id = ?", subscription.ContentCreatorID).Error; err != nil {
+		utils.LogErrorWithUser(userID, err, "Erreur lors de la récupération des infos du créateur dans CancelSubscription")
+	} else if err := db.DB.First(&user, "id = ?", userID).Error; err != nil {
+		utils.LogErrorWithUser(userID, err, "Erreur lors de la récupération des infos de l'utilisateur dans CancelSubscription")
+	} else {
+		// Envoi du mail de confirmation d'annulation
+		go mailsmodels.SubscriptionCancellation(user.Email, creator.UserName)
 	}
 
 	utils.LogSuccessWithUser(userID, "Abonnement annulé avec succès dans CancelSubscription")
