@@ -1970,11 +1970,12 @@ paths:
     delete:
       consumes:
       - application/json
-      description: Cancel a Stripe subscription and update its status in the database
+      description: Cancel a Stripe subscription for a content creator and update its
+        status in the database
       parameters:
-      - description: ID of the subscription to cancel
+      - description: ID of the content creator
         in: path
-        name: subscriptionId
+        name: creatorId
         required: true
         type: string
       produces:
@@ -2012,7 +2013,7 @@ paths:
             type: object
       security:
       - BearerAuth: []
-      summary: Cancel a subscription
+      summary: Cancel a subscription for a content creator
       tags:
       - subscriptions
   /subscriptions/{subscriptionId}:

@@ -11,6 +11,7 @@ import (
 	"pec2-backend/db"
 	"pec2-backend/models"
 	"pec2-backend/utils"
+	mailsmodels "pec2-backend/utils/mails-models"
 
 	"github.com/gin-gonic/gin"
 	stripe "github.com/stripe/stripe-go/v82"
@@ -314,6 +315,7 @@ func handlePaymentIntentSucceeded(c *gin.Context, event stripe.Event) {
 
 	utils.LogSuccess("Subscription activated via payment_intent.succeeded dans handlePaymentIntentSucceeded")
 	updateSubscriptionStatus(sub)
+
 	c.JSON(http.StatusOK, gin.H{"message": "Subscription activated via payment_intent.succeeded"})
 }
 
@@ -442,6 +444,17 @@ func handleInvoicePaymentSucceeded(c *gin.Context, event stripe.Event) {
 
 	utils.LogSuccess("Subscription activated via invoice.payment_succeeded dans handleInvoicePaymentSucceeded")
 	updateSubscriptionStatus(sub)
+
+	// Envoi du mail de confirmation pour tous les paiements réussis
+	var user models.User
+	var creator models.User
+	if err := db.DB.First(&user, "id = ?", sub.UserID).Error; err != nil {
+		utils.LogError(err, "Erreur lors de la récupération des infos de l'utilisateur dans handleInvoicePaymentSucceeded")
+	} else if err := db.DB.First(&creator, "id = ?", sub.ContentCreatorID).Error; err != nil {
+		utils.LogError(err, "Erreur lors de la récupération des infos du créateur dans handleInvoicePaymentSucceeded")
+	} else {
+		go mailsmodels.SubscriptionConfirmation(user.Email, creator.UserName)
+	}
 
 	var message string
 	if sub.Status == models.SubscriptionPending {
