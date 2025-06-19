@@ -123,13 +123,13 @@ func CreateSubscriptionCheckoutSession(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"sessionId": s.ID, "url": s.URL})
 }
 
-// CancelSubscription cancels a Stripe subscription and updates its status in the database
-// @Summary Cancel a subscription
-// @Description Cancel a Stripe subscription and update its status in the database
+// CancelSubscription cancels a Stripe subscription for a content creator and updates its status in the database
+// @Summary Cancel a subscription for a content creator
+// @Description Cancel a Stripe subscription for a content creator and update its status in the database
 // @Tags subscriptions
 // @Accept json
 // @Produce json
-// @Param subscriptionId path string true "ID of the subscription to cancel"
+// @Param creatorId path string true "ID of the content creator"
 // @Security BearerAuth
 // @Success 200 {object} map[string]string "message: Subscription canceled successfully"
 // @Failure 401 {object} map[string]string "error: Unauthorized"
