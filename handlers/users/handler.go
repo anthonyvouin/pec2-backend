@@ -388,11 +388,9 @@ func GetUserStatistics(c *gin.Context) {
 		return
 	}
 
-	// Correction du format de date pour supporter le format YYYY-MM-DD
 	var startDate, endDate time.Time
 	var err error
 
-	// Essayer différents formats de date
 	formats := []string{"2006-01-02", "2006-01-02T15:04:05Z07:00", "2006-01-02T15:04:05Z"}
 	startDateParsed := false
 
