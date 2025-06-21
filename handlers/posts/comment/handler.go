@@ -41,6 +41,39 @@ type SSEComment struct {
 
 func GetCommentsByPostID(c *gin.Context) {
 	postId := c.Param("id")
+
+	// Vérifier si les commentaires sont activés pour ce post
+	var post models.Post
+	if err := db.DB.Preload("User").First(&post, "id = ?", postId).Error; err != nil {
+		utils.LogError(err, "Post not found in GetCommentsByPostID")
+		c.JSON(http.StatusNotFound, gin.H{"error": "Post not found"})
+		return
+	}
+
+	// Récupérer les préférences de l'auteur du post
+	var userSettings models.UserSettings
+	if err := db.DB.Where("user_id = ?", post.UserID).First(&userSettings).Error; err != nil {
+		// Si les préférences n'existent pas, les créer avec les valeurs par défaut de l'utilisateur
+		userSettings = models.UserSettings{
+			UserID:         post.UserID,
+			CommentEnabled: post.User.CommentsEnable,
+			MessageEnabled: post.User.MessageEnable,
+		}
+
+		// Sauvegarder les nouvelles préférences
+		if err := db.DB.Create(&userSettings).Error; err != nil {
+			utils.LogError(err, "Error creating user settings in GetCommentsByPostID")
+			// On continue avec la valeur par défaut de userSettings
+		}
+	}
+
+	// Si les commentaires sont désactivés, renvoyer une erreur
+	if !userSettings.CommentEnabled {
+		utils.LogError(nil, "Comments disabled for post in GetCommentsByPostID")
+		c.JSON(http.StatusForbidden, gin.H{"error": "Comments are disabled for this post"})
+		return
+	}
+
 	var comments []models.Comment
 
 	if err := db.DB.Where("post_id = ?", postId).Find(&comments).Error; err != nil {
@@ -259,11 +292,24 @@ func CreateComment(c *gin.Context) {
 		userID = claims["user_id"]
 		exists = true
 	}
-
 	if !exists {
 		utils.LogError(nil, "User not found in token in CreateComment")
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not found in token"})
 		return
+	}
+
+	// Vérifier si l'utilisateur a activé les commentaires
+	var userSettings models.UserSettings
+	if err := db.DB.Where("user_id = ?", userID).First(&userSettings).Error; err != nil {
+		// Si les paramètres n'existent pas, on considère que les commentaires sont activés par défaut
+		utils.LogError(err, "User settings not found in CreateComment, using default values")
+	} else {
+		// Si les paramètres existent et que les commentaires sont désactivés, on renvoie une erreur
+		if !userSettings.CommentEnabled {
+			utils.LogError(nil, "Comments disabled for user in CreateComment")
+			c.JSON(http.StatusForbidden, gin.H{"error": "Comments are disabled in your preferences"})
+			return
+		}
 	}
 
 	// Récupérer le contenu du commentaire
@@ -312,6 +358,39 @@ func CreateComment(c *gin.Context) {
 		CreatedAt:     comment.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
 		CommentsCount: comment.CommentsCount,
 	}
+
+	// Vérifier si les commentaires sont activés pour le post
+	var post models.Post
+	if err := db.DB.Preload("User").First(&post, "id = ?", postID).Error; err != nil {
+		utils.LogError(err, "Post not found in CreateComment")
+		c.JSON(http.StatusNotFound, gin.H{"error": "Post not found"})
+		return
+	}
+
+	// Vérifier si l'auteur du post a activé les commentaires
+	var postUserSettings models.UserSettings
+	if err := db.DB.Where("user_id = ?", post.UserID).First(&postUserSettings).Error; err != nil {
+		// Si les préférences n'existent pas, les créer avec les valeurs par défaut de l'utilisateur
+		postUserSettings = models.UserSettings{
+			UserID:         post.UserID,
+			CommentEnabled: post.User.CommentsEnable,
+			MessageEnabled: post.User.MessageEnable,
+		}
+
+		// Sauvegarder les nouvelles préférences
+		if err := db.DB.Create(&postUserSettings).Error; err != nil {
+			utils.LogError(err, "Error creating post author settings in CreateComment")
+			// On continue avec la valeur par défaut de postUserSettings
+		}
+	}
+
+	// Si les commentaires sont désactivés pour le post, on renvoie une erreur
+	if !postUserSettings.CommentEnabled {
+		utils.LogError(nil, "Comments disabled for post in CreateComment")
+		c.JSON(http.StatusForbidden, gin.H{"error": "Comments are disabled for this post"})
+		return
+	}
+
 	// Diffuser à tous les clients connectés pour ce post
 	broadcastComment(postID, sseComment)
 
@@ -359,4 +438,41 @@ func broadcastComment(postID string, comment SSEComment) {
 			clientsMutex.Unlock()
 		}
 	}
+}
+
+// Fonction auxiliaire pour vérifier si les commentaires sont activés pour un utilisateur
+func checkCommentsEnabled(userID interface{}) (bool, error) {
+	var userSettings models.UserSettings
+	if err := db.DB.Where("user_id = ?", userID).First(&userSettings).Error; err != nil {
+		// Si les paramètres n'existent pas, on considère que les commentaires sont activés par défaut
+		return true, err
+	}
+	return userSettings.CommentEnabled, nil
+}
+
+// Fonction pour s'assurer que les préférences utilisateur existent
+func ensureUserSettingsExist(userID string) (*models.UserSettings, error) {
+	var userSettings models.UserSettings
+
+	// Rechercher les préférences existantes
+	result := db.DB.Where("user_id = ?", userID).First(&userSettings)
+
+	// Si les préférences existent, les retourner
+	if result.Error == nil {
+		return &userSettings, nil
+	}
+
+	// Si les préférences n'existent pas, les créer avec les valeurs par défaut
+	userSettings = models.UserSettings{
+		UserID:         userID,
+		CommentEnabled: true, // Valeur par défaut
+		MessageEnabled: true, // Valeur par défaut
+	}
+
+	// Sauvegarder les nouvelles préférences
+	if err := db.DB.Create(&userSettings).Error; err != nil {
+		return nil, err
+	}
+
+	return &userSettings, nil
 }

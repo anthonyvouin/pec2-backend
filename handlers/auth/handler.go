@@ -201,6 +201,19 @@ func CreateUser(c *gin.Context) {
 		return
 	}
 
+	// Créer les préférences utilisateur par défaut
+	userSettings := models.UserSettings{
+		UserID:         user.ID,
+		CommentEnabled: true,  // Valeur par défaut
+		MessageEnabled: true,  // Valeur par défaut
+	}
+	
+	if err := db.DB.Create(&userSettings).Error; err != nil {
+		utils.LogError(err, "Error creating user settings in CreateUser")
+		// On ne retourne pas d'erreur au client car l'utilisateur a été créé avec succès
+		// Les préférences seront créées lors de la première utilisation si nécessaire
+	}
+
 	mailsmodels.ConfirmEmail(user.Email, code)
 	userID, exists := c.Get("user_id")
 	if !exists {

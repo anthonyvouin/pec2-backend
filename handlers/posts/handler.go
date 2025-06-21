@@ -216,12 +216,12 @@ func GetAllPosts(c *gin.Context) {
 
 	offset := (page - 1) * limit
 	query = query.Limit(limit).Offset(offset)
-
 	if err := query.Find(&posts).Error; err != nil {
 		utils.LogError(err, "Error retrieving posts in GetAllPosts")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error retrieving posts: " + err.Error()})
 		return
 	}
+	
 	var response []models.PostResponse = make([]models.PostResponse, 0, len(posts))
 	for _, post := range posts {
 		// Compter le nombre de likes
@@ -234,25 +234,33 @@ func GetAllPosts(c *gin.Context) {
 		// Compter le nombre de reports
 		var reportsCount int64
 		db.DB.Model(&models.Report{}).Where("post_id = ?", post.ID).Count(&reportsCount)
+		
+		// Récupérer ou créer les préférences de l'utilisateur du post
+		commentEnabled := true // Valeur par défaut
+		userSettings, err := ensureUserSettingsExist(post.UserID)
+		if err == nil {
+			commentEnabled = userSettings.CommentEnabled
+		}
 
 		// Créer la réponse pour ce post
 		postResponse := models.PostResponse{
-			ID:         post.ID,
-			Name:       post.Name,
-			PictureURL: post.PictureURL,
-			IsFree:     post.IsFree,
-			Enable:     post.Enable,
-			Categories: post.Categories,
-			CreatedAt:  post.CreatedAt,
-			UpdatedAt:  post.UpdatedAt,
+			ID:             post.ID,
+			Name:           post.Name,
+			PictureURL:     post.PictureURL,
+			IsFree:         post.IsFree,
+			Enable:         post.Enable,
+			Categories:     post.Categories,
+			CreatedAt:      post.CreatedAt,
+			UpdatedAt:      post.UpdatedAt,
 			User: models.UserInfo{
 				ID:             post.User.ID,
 				UserName:       post.User.UserName,
 				ProfilePicture: post.User.ProfilePicture,
 			},
-			LikesCount:    int(likesCount),
-			CommentsCount: int(commentsCount),
-			ReportsCount:  int(reportsCount),
+			LikesCount:     int(likesCount),
+			CommentsCount:  int(commentsCount),
+			ReportsCount:   int(reportsCount),
+			CommentEnabled: commentEnabled,
 		}
 
 		response = append(response, postResponse)
@@ -302,29 +310,36 @@ func GetPostByID(c *gin.Context) {
 	// Compter le nombre de commentaires
 	var commentsCount int64
 	db.DB.Model(&models.Comment{}).Where("post_id = ?", post.ID).Count(&commentsCount)
-
 	// Compter le nombre de reports
 	var reportsCount int64
 	db.DB.Model(&models.Report{}).Where("post_id = ?", post.ID).Count(&reportsCount)
+	
+	// Récupérer ou créer les préférences de l'utilisateur du post
+	commentEnabled := true // Valeur par défaut
+	userSettings, err := ensureUserSettingsExist(post.UserID)
+	if err == nil {
+		commentEnabled = userSettings.CommentEnabled
+	}
 
 	// Créer la réponse pour ce post
 	postResponse := models.PostResponse{
-		ID:         post.ID,
-		Name:       post.Name,
-		PictureURL: post.PictureURL,
-		IsFree:     post.IsFree,
-		Enable:     post.Enable,
-		Categories: post.Categories,
-		CreatedAt:  post.CreatedAt,
-		UpdatedAt:  post.UpdatedAt,
+		ID:             post.ID,
+		Name:           post.Name,
+		PictureURL:     post.PictureURL,
+		IsFree:         post.IsFree,
+		Enable:         post.Enable,
+		Categories:     post.Categories,
+		CreatedAt:      post.CreatedAt,
+		UpdatedAt:      post.UpdatedAt,
 		User: models.UserInfo{
 			ID:             post.User.ID,
 			UserName:       post.User.UserName,
 			ProfilePicture: post.User.ProfilePicture,
 		},
-		LikesCount:    int(likesCount),
-		CommentsCount: int(commentsCount),
-		ReportsCount:  int(reportsCount),
+		LikesCount:     int(likesCount),
+		CommentsCount:  int(commentsCount),
+		ReportsCount:   int(reportsCount),
+		CommentEnabled: commentEnabled,
 	}
 
 	utils.LogSuccess("Post retrieved successfully in GetPostByID")
@@ -494,4 +509,42 @@ func DeletePost(c *gin.Context) {
 
 	utils.LogSuccess("Post deleted successfully in DeletePost")
 	c.JSON(http.StatusOK, gin.H{"message": "Post deleted successfully"})
+}
+
+// Fonction pour s'assurer que les préférences utilisateur existent
+func ensureUserSettingsExist(userID string) (*models.UserSettings, error) {
+	var userSettings models.UserSettings
+	
+	// Rechercher les préférences existantes
+	result := db.DB.Where("user_id = ?", userID).First(&userSettings)
+	
+	// Si les préférences existent, les retourner
+	if result.Error == nil {
+		return &userSettings, nil
+	}
+	
+	// Si les préférences n'existent pas, récupérer les valeurs par défaut depuis le modèle User
+	var user models.User
+	if err := db.DB.Where("id = ?", userID).First(&user).Error; err != nil {
+		// Si l'utilisateur n'existe pas, utiliser les valeurs par défaut
+		userSettings = models.UserSettings{
+			UserID:         userID,
+			CommentEnabled: true,  // Valeur par défaut
+			MessageEnabled: true,  // Valeur par défaut
+		}
+	} else {
+		// Utiliser les valeurs de l'utilisateur
+		userSettings = models.UserSettings{
+			UserID:         userID,
+			CommentEnabled: user.CommentsEnable,
+			MessageEnabled: user.MessageEnable,
+		}
+	}
+	
+	// Sauvegarder les nouvelles préférences
+	if err := db.DB.Create(&userSettings).Error; err != nil {
+		return nil, err
+	}
+	
+	return &userSettings, nil
 }

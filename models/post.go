@@ -35,18 +35,19 @@ type PostUpdate struct {
 }
 
 type PostResponse struct {
-	ID            string     `json:"id"`
-	Name          string     `json:"name"`
-	PictureURL    string     `json:"pictureUrl"`
-	IsFree        bool       `json:"isFree"`
-	Enable        bool       `json:"enable"`
-	Categories    []Category `json:"categories"`
-	CreatedAt     time.Time  `json:"createdAt"`
-	UpdatedAt     time.Time  `json:"updatedAt"`
-	User          UserInfo   `json:"user"`
-	LikesCount    int        `json:"likesCount"`
-	CommentsCount int        `json:"commentsCount"`
-	ReportsCount  int        `json:"reportsCount"`
+	ID             string     `json:"id"`
+	Name           string     `json:"name"`
+	PictureURL     string     `json:"pictureUrl"`
+	IsFree         bool       `json:"isFree"`
+	Enable         bool       `json:"enable"`
+	Categories     []Category `json:"categories"`
+	CreatedAt      time.Time  `json:"createdAt"`
+	UpdatedAt      time.Time  `json:"updatedAt"`
+	User           UserInfo   `json:"user"`
+	LikesCount     int        `json:"likesCount"`
+	CommentsCount  int        `json:"commentsCount"`
+	ReportsCount   int        `json:"reportsCount"`
+	CommentEnabled bool       `json:"commentEnabled"`
 }
 
 type UserInfo struct {
