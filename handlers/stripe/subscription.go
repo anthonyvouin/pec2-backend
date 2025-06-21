@@ -56,11 +56,17 @@ func CreateSubscriptionCheckoutSession(c *gin.Context) {
 	if err != nil {
 		utils.LogErrorWithUser(userID, err, "Content creator not found dans CreateSubscriptionCheckoutSession")
 		c.JSON(http.StatusNotFound, gin.H{"error": "Content creator not found"})
-		return
-	}
+		return	}
 	if creator.Role != models.ContentCreator {
 		utils.LogErrorWithUser(userID, nil, "Can only subscribe to a content creator dans CreateSubscriptionCheckoutSession")
 		c.JSON(http.StatusForbidden, gin.H{"error": "Can only subscribe to a content creator"})
+		return
+	}
+	
+	// Vérifier si le créateur de contenu a activé les abonnements
+	if !creator.SubscriptionEnable {
+		utils.LogErrorWithUser(userID, nil, "Ce créateur de contenu a désactivé les abonnements dans CreateSubscriptionCheckoutSession")
+		c.JSON(http.StatusForbidden, gin.H{"error": "Ce créateur de contenu n'accepte pas les abonnements actuellement"})
 		return
 	}
 

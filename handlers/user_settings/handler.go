@@ -5,7 +5,6 @@ import (
 	"pec2-backend/db"
 	"pec2-backend/models"
 	"pec2-backend/utils"
-	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -14,6 +13,14 @@ import (
 type UpdateSettingsRequest struct {
 	CommentEnabled *bool `json:"commentEnabled"`
 	MessageEnabled *bool `json:"messageEnabled"`
+	SubscriptionEnabled *bool `json:"subscriptionEnabled"`
+}
+
+// Structure pour uniformiser la réponse
+type UserSettingsResponse struct {
+	CommentEnabled bool `json:"commentEnabled"`
+	MessageEnabled bool `json:"messageEnabled"`
+	SubscriptionEnabled bool `json:"subscriptionEnabled"`
 }
 
 // @Summary Get user settings
@@ -22,9 +29,9 @@ type UpdateSettingsRequest struct {
 // @Accept json
 // @Produce json
 // @Security BearerAuth
-// @Success 200 {object} models.UserSettings
+// @Success 200 {object} UserSettingsResponse
 // @Failure 401 {object} map[string]string "error: Unauthorized"
-// @Failure 404 {object} map[string]string "error: Settings not found"
+// @Failure 404 {object} map[string]string "error: User not found"
 // @Failure 500 {object} map[string]string "error: error message"
 // @Router /user-settings [get]
 func GetUserSettings(c *gin.Context) {
@@ -35,30 +42,21 @@ func GetUserSettings(c *gin.Context) {
 		return
 	}
 
-	// Vérifier si des paramètres existent déjà pour cet utilisateur
-	var settings models.UserSettings
-	result := db.DB.Where("user_id = ?", userID).First(&settings)
+	// Récupérer l'utilisateur
+	var user models.User
+	result := db.DB.Where("id = ?", userID).First(&user)
 
 	if result.Error != nil {
-		// Si les paramètres n'existent pas, créer des paramètres par défaut
-		if result.Error.Error() == "record not found" {
-			settings = models.UserSettings{
-				UserID:         userID.(string),
-				CommentEnabled: true,
-				MessageEnabled: true,
-				CreatedAt:      time.Now(),
-				UpdatedAt:      time.Now(),
-			}
-			if err := db.DB.Create(&settings).Error; err != nil {
-				utils.LogError(err, "Erreur lors de la création des paramètres utilisateur")
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "Erreur lors de la création des paramètres"})
-				return
-			}
-		} else {
-			utils.LogError(result.Error, "Erreur lors de la récupération des paramètres utilisateur")
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Erreur lors de la récupération des paramètres"})
-			return
-		}
+		utils.LogError(result.Error, "Erreur lors de la récupération de l'utilisateur")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erreur lors de la récupération de l'utilisateur"})
+		return
+	}
+
+	// Créer la réponse avec les paramètres de l'utilisateur
+	settings := UserSettingsResponse{
+		CommentEnabled: user.CommentsEnable,
+		MessageEnabled: user.MessageEnable,
+		SubscriptionEnabled: user.SubscriptionEnable,
 	}
 
 	c.JSON(http.StatusOK, settings)
@@ -71,7 +69,7 @@ func GetUserSettings(c *gin.Context) {
 // @Produce json
 // @Security BearerAuth
 // @Param settings body UpdateSettingsRequest true "Settings to update"
-// @Success 200 {object} models.UserSettings
+// @Success 200 {object} UserSettingsResponse
 // @Failure 400 {object} map[string]string "error: Bad request"
 // @Failure 401 {object} map[string]string "error: Unauthorized"
 // @Failure 500 {object} map[string]string "error: error message"
@@ -92,65 +90,40 @@ func UpdateUserSettings(c *gin.Context) {
 		return
 	}
 
-	// Chercher les paramètres existants ou créer de nouveaux paramètres
-	var settings models.UserSettings
-	result := db.DB.Where("user_id = ?", userID).First(&settings)
+	// Récupérer l'utilisateur
+	var user models.User
+	result := db.DB.Where("id = ?", userID).First(&user)
 
 	if result.Error != nil {
-		if result.Error.Error() == "record not found" {
-			// Créer de nouveaux paramètres si aucun n'existe
-			settings = models.UserSettings{
-				UserID:         userID.(string),
-				CommentEnabled: true,
-				MessageEnabled: true,
-				CreatedAt:      time.Now(),
-			}
-		} else {
-			utils.LogError(result.Error, "Erreur lors de la récupération des paramètres utilisateur")
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Erreur lors de la récupération des paramètres"})
-			return
-		}
+		utils.LogError(result.Error, "Erreur lors de la récupération de l'utilisateur")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erreur lors de la récupération de l'utilisateur"})
+		return
 	}
+
 	// Mettre à jour les champs si fournis dans la requête
 	if request.CommentEnabled != nil {
-		settings.CommentEnabled = *request.CommentEnabled
+		user.CommentsEnable = *request.CommentEnabled
 	}
 	if request.MessageEnabled != nil {
-		settings.MessageEnabled = *request.MessageEnabled
+		user.MessageEnable = *request.MessageEnabled
 	}
-	settings.UpdatedAt = time.Now()
+	if request.SubscriptionEnabled != nil {
+		user.SubscriptionEnable = *request.SubscriptionEnabled
+	}
 
 	// Enregistrer les modifications
-	var saveErr error
-	if result.Error != nil && result.Error.Error() == "record not found" {
-		saveErr = db.DB.Create(&settings).Error
-	} else {
-		saveErr = db.DB.Save(&settings).Error
-	}
-
-	if saveErr != nil {
-		utils.LogError(saveErr, "Erreur lors de la sauvegarde des paramètres utilisateur")
+	if err := db.DB.Save(&user).Error; err != nil {
+		utils.LogError(err, "Erreur lors de la sauvegarde des paramètres utilisateur")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erreur lors de la sauvegarde des paramètres"})
 		return
 	}
 
-	// Synchroniser les paramètres avec le modèle User
-	var user models.User
-	if err := db.DB.Where("id = ?", userID).First(&user).Error; err == nil {
-		// Mettre à jour les champs correspondants dans User
-		if request.CommentEnabled != nil {
-			user.CommentsEnable = *request.CommentEnabled
-		}
-		if request.MessageEnabled != nil {
-			user.MessageEnable = *request.MessageEnabled
-		}
-		
-		// Sauvegarder les modifications de l'utilisateur
-		if err := db.DB.Save(&user).Error; err != nil {
-			utils.LogError(err, "Erreur lors de la synchronisation des paramètres avec l'utilisateur")
-			// Continuer malgré l'erreur car les paramètres ont été sauvegardés
-		}
+	// Préparer la réponse
+	response := UserSettingsResponse{
+		CommentEnabled:      user.CommentsEnable,
+		MessageEnabled:      user.MessageEnable,
+		SubscriptionEnabled: user.SubscriptionEnable,
 	}
 
-	c.JSON(http.StatusOK, settings)
+	c.JSON(http.StatusOK, response)
 }

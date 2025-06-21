@@ -41,7 +41,6 @@ type SSEComment struct {
 
 func GetCommentsByPostID(c *gin.Context) {
 	postId := c.Param("id")
-
 	// Vérifier si les commentaires sont activés pour ce post
 	var post models.Post
 	if err := db.DB.Preload("User").First(&post, "id = ?", postId).Error; err != nil {
@@ -50,25 +49,8 @@ func GetCommentsByPostID(c *gin.Context) {
 		return
 	}
 
-	// Récupérer les préférences de l'auteur du post
-	var userSettings models.UserSettings
-	if err := db.DB.Where("user_id = ?", post.UserID).First(&userSettings).Error; err != nil {
-		// Si les préférences n'existent pas, les créer avec les valeurs par défaut de l'utilisateur
-		userSettings = models.UserSettings{
-			UserID:         post.UserID,
-			CommentEnabled: post.User.CommentsEnable,
-			MessageEnabled: post.User.MessageEnable,
-		}
-
-		// Sauvegarder les nouvelles préférences
-		if err := db.DB.Create(&userSettings).Error; err != nil {
-			utils.LogError(err, "Error creating user settings in GetCommentsByPostID")
-			// On continue avec la valeur par défaut de userSettings
-		}
-	}
-
-	// Si les commentaires sont désactivés, renvoyer une erreur
-	if !userSettings.CommentEnabled {
+	// Si les commentaires sont désactivés pour l'auteur du post, renvoyer une erreur
+	if !post.User.CommentsEnable {
 		utils.LogError(nil, "Comments disabled for post in GetCommentsByPostID")
 		c.JSON(http.StatusForbidden, gin.H{"error": "Comments are disabled for this post"})
 		return
@@ -296,20 +278,20 @@ func CreateComment(c *gin.Context) {
 		utils.LogError(nil, "User not found in token in CreateComment")
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not found in token"})
 		return
+	}	
+	// Vérifier si l'utilisateur a activé les commentaires
+	var commentUser models.User
+	if err := db.DB.Where("id = ?", userID).First(&commentUser).Error; err != nil {
+		utils.LogError(err, "User not found in CreateComment")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve user"})
+		return
 	}
 
-	// Vérifier si l'utilisateur a activé les commentaires
-	var userSettings models.UserSettings
-	if err := db.DB.Where("user_id = ?", userID).First(&userSettings).Error; err != nil {
-		// Si les paramètres n'existent pas, on considère que les commentaires sont activés par défaut
-		utils.LogError(err, "User settings not found in CreateComment, using default values")
-	} else {
-		// Si les paramètres existent et que les commentaires sont désactivés, on renvoie une erreur
-		if !userSettings.CommentEnabled {
-			utils.LogError(nil, "Comments disabled for user in CreateComment")
-			c.JSON(http.StatusForbidden, gin.H{"error": "Comments are disabled in your preferences"})
-			return
-		}
+	// Si les commentaires sont désactivés pour l'utilisateur, renvoyer une erreur
+	if !commentUser.CommentsEnable {
+		utils.LogError(nil, "Comments disabled for user in CreateComment")
+		c.JSON(http.StatusForbidden, gin.H{"error": "Comments are disabled in your preferences"})
+		return
 	}
 
 	// Récupérer le contenu du commentaire
@@ -366,26 +348,10 @@ func CreateComment(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Post not found"})
 		return
 	}
-
 	// Vérifier si l'auteur du post a activé les commentaires
-	var postUserSettings models.UserSettings
-	if err := db.DB.Where("user_id = ?", post.UserID).First(&postUserSettings).Error; err != nil {
-		// Si les préférences n'existent pas, les créer avec les valeurs par défaut de l'utilisateur
-		postUserSettings = models.UserSettings{
-			UserID:         post.UserID,
-			CommentEnabled: post.User.CommentsEnable,
-			MessageEnabled: post.User.MessageEnable,
-		}
-
-		// Sauvegarder les nouvelles préférences
-		if err := db.DB.Create(&postUserSettings).Error; err != nil {
-			utils.LogError(err, "Error creating post author settings in CreateComment")
-			// On continue avec la valeur par défaut de postUserSettings
-		}
-	}
-
+	// Utiliser directement les préférences de l'utilisateur stockées dans User
 	// Si les commentaires sont désactivés pour le post, on renvoie une erreur
-	if !postUserSettings.CommentEnabled {
+	if !post.User.CommentsEnable {
 		utils.LogError(nil, "Comments disabled for post in CreateComment")
 		c.JSON(http.StatusForbidden, gin.H{"error": "Comments are disabled for this post"})
 		return
@@ -441,38 +407,22 @@ func broadcastComment(postID string, comment SSEComment) {
 }
 
 // Fonction auxiliaire pour vérifier si les commentaires sont activés pour un utilisateur
-func checkCommentsEnabled(userID interface{}) (bool, error) {
-	var userSettings models.UserSettings
-	if err := db.DB.Where("user_id = ?", userID).First(&userSettings).Error; err != nil {
-		// Si les paramètres n'existent pas, on considère que les commentaires sont activés par défaut
+func checkCommentsEnabled(userID interface{}) (bool, error) {	var user models.User
+	if err := db.DB.Where("id = ?", userID).First(&user).Error; err != nil {
+		// Si l'utilisateur n'existe pas, on considère que les commentaires sont activés par défaut
 		return true, err
 	}
-	return userSettings.CommentEnabled, nil
+	return user.CommentsEnable, nil
 }
 
-// Fonction pour s'assurer que les préférences utilisateur existent
-func ensureUserSettingsExist(userID string) (*models.UserSettings, error) {
-	var userSettings models.UserSettings
+// Fonction pour vérifier les préférences de commentaires d'un utilisateur
+func getUserCommentsPreference(userID string) (bool, error) {
+	var user models.User
 
-	// Rechercher les préférences existantes
-	result := db.DB.Where("user_id = ?", userID).First(&userSettings)
-
-	// Si les préférences existent, les retourner
-	if result.Error == nil {
-		return &userSettings, nil
+	// Rechercher l'utilisateur
+	if err := db.DB.Where("id = ?", userID).First(&user).Error; err != nil {
+		return false, err
 	}
 
-	// Si les préférences n'existent pas, les créer avec les valeurs par défaut
-	userSettings = models.UserSettings{
-		UserID:         userID,
-		CommentEnabled: true, // Valeur par défaut
-		MessageEnabled: true, // Valeur par défaut
-	}
-
-	// Sauvegarder les nouvelles préférences
-	if err := db.DB.Create(&userSettings).Error; err != nil {
-		return nil, err
-	}
-
-	return &userSettings, nil
+	return user.CommentsEnable, nil
 }

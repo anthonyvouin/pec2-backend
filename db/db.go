@@ -36,8 +36,7 @@ func InitDB() {
 	err = DB.AutoMigrate(
 		&models.User{},
 		&models.Contact{},
-		&models.Post{},
-		&models.Like{},
+		&models.Post{},		&models.Like{},
 		&models.Report{},
 		&models.Comment{},
 		&models.Category{},
@@ -46,7 +45,6 @@ func InitDB() {
 		&models.Subscription{},
 		&models.SubscriptionPayment{},
 		&models.UserFollow{},
-		&models.UserSettings{},
 	)
 	if err != nil {
 		utils.LogError(err, "Error migrating database")

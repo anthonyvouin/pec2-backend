@@ -48,6 +48,7 @@ type PostResponse struct {
 	CommentsCount  int        `json:"commentsCount"`
 	ReportsCount   int        `json:"reportsCount"`
 	CommentEnabled bool       `json:"commentEnabled"`
+	MessageEnabled bool       `json:"messageEnabled"`
 }
 
 type UserInfo struct {
