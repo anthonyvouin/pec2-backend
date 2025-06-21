@@ -289,15 +289,39 @@ func GetTotalRevenue(c *gin.Context) {
 		return
 	}
 
-	startDate, err := time.Parse("2006-01-02", startDateStr)
-	if err != nil {
-		utils.LogError(err, "Invalid start_date format in GetTotalRevenue")
+	// Correction du format de date pour supporter le format YYYY-MM-DD
+	var startDate, endDate time.Time
+	var err error
+
+	// Essayer différents formats de date
+	formats := []string{"2006-01-02", "2006-01-02T15:04:05Z07:00", "2006-01-02T15:04:05Z"}
+	startDateParsed := false
+
+	for _, format := range formats {
+		startDate, err = time.Parse(format, startDateStr)
+		if err == nil {
+			startDateParsed = true
+			break
+		}
+	}
+
+	if !startDateParsed {
+		utils.LogError(err, "Invalid start_date format in GetTotalRevenue: "+startDateStr)
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid start_date format (YYYY-MM-DD)"})
 		return
 	}
-	endDate, err := time.Parse("2006-01-02", endDateStr)
-	if err != nil {
-		utils.LogError(err, "Invalid end_date format in GetTotalRevenue")
+
+	endDateParsed := false
+	for _, format := range formats {
+		endDate, err = time.Parse(format, endDateStr)
+		if err == nil {
+			endDateParsed = true
+			break
+		}
+	}
+
+	if !endDateParsed {
+		utils.LogError(err, "Invalid end_date format in GetTotalRevenue: "+endDateStr)
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid end_date format (YYYY-MM-DD)"})
 		return
 	}
@@ -322,7 +346,7 @@ func GetTotalRevenue(c *gin.Context) {
 	type DailyData struct {
 		Date   string `json:"date"`
 		Amount int64  `json:"amount"`
-		Count  int64  `json:"count"` 
+		Count  int64  `json:"count"`
 	}
 
 	var dailyData []DailyData

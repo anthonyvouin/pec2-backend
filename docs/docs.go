@@ -3044,7 +3044,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Get count of users by month or year",
+                "description": "Get count of new users by day between start and end dates",
                 "consumes": [
                     "application/json"
                 ],
@@ -3058,36 +3058,29 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Filter type: 'month' or 'year'",
-                        "name": "filter",
+                        "description": "Start date (YYYY-MM-DD)",
+                        "name": "start_date",
                         "in": "query",
                         "required": true
                     },
                     {
-                        "type": "integer",
-                        "description": "Year to filter by (default is current year)",
-                        "name": "year",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "description": "Month to filter by (1-12, only used with 'month' filter)",
-                        "name": "month",
-                        "in": "query"
+                        "type": "string",
+                        "description": "End date (YYYY-MM-DD)",
+                        "name": "end_date",
+                        "in": "query",
+                        "required": true
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "total: total number of users, daily_data: array of daily user registration data",
                         "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/users.UserStatsResponse"
-                            }
+                            "type": "object",
+                            "additionalProperties": true
                         }
                     },
                     "400": {
-                        "description": "error: Invalid filter parameter",
+                        "description": "error: Invalid date parameters",
                         "schema": {
                             "type": "object",
                             "additionalProperties": {
@@ -4211,20 +4204,6 @@ const docTemplate = `{
                 "email": {
                     "type": "string",
                     "example": "utilisateur@exemple.com"
-                }
-            }
-        },
-        "users.UserStatsResponse": {
-            "type": "object",
-            "properties": {
-                "count": {
-                    "type": "integer"
-                },
-                "label": {
-                    "type": "string"
-                },
-                "period": {
-                    "type": "string"
                 }
             }
         }
