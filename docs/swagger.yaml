@@ -2111,8 +2111,8 @@ paths:
     get:
       consumes:
       - application/json
-      description: Returns the total amount of successful subscription payments between
-        two dates (admin only)
+      description: Returns the total amount and daily breakdown of successful subscription
+        payments between two dates (admin only)
       parameters:
       - description: Start date (YYYY-MM-DD)
         in: query
@@ -2128,7 +2128,8 @@ paths:
       - application/json
       responses:
         "200":
-          description: 'total: total amount in cents'
+          description: 'total: total amount in cents, daily_data: array of daily revenue
+            data'
           schema:
             additionalProperties: true
             type: object

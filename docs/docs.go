@@ -2215,7 +2215,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Returns the total amount of successful subscription payments between two dates (admin only)",
+                "description": "Returns the total amount and daily breakdown of successful subscription payments between two dates (admin only)",
                 "consumes": [
                     "application/json"
                 ],
@@ -2244,7 +2244,7 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "total: total amount in cents",
+                        "description": "total: total amount in cents, daily_data: array of daily revenue data",
                         "schema": {
                             "type": "object",
                             "additionalProperties": true

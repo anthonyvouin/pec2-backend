@@ -266,14 +266,14 @@ func GetSubscriptionDetail(c *gin.Context) {
 
 // GetTotalRevenue allows an admin to retrieve the total sum of payments over a given period (admin only)
 // @Summary Get the total revenue of the site
-// @Description Returns the total amount of successful subscription payments between two dates (admin only)
+// @Description Returns the total amount and daily breakdown of successful subscription payments between two dates (admin only)
 // @Tags subscriptions
 // @Accept json
 // @Produce json
 // @Param start_date query string true "Start date (YYYY-MM-DD)"
 // @Param end_date query string true "End date (YYYY-MM-DD)"
 // @Security BearerAuth
-// @Success 200 {object} map[string]interface{} "total: total amount in cents"
+// @Success 200 {object} map[string]interface{} "total: total amount in cents, daily_data: array of daily revenue data"
 // @Failure 400 {object} map[string]string "error: Invalid input"
 // @Failure 401 {object} map[string]string "error: Unauthorized"
 // @Failure 403 {object} map[string]string "error: Access denied"
@@ -307,6 +307,7 @@ func GetTotalRevenue(c *gin.Context) {
 		return
 	}
 
+	// Calcul du montant total
 	var total int64
 	err = db.DB.Model(&models.SubscriptionPayment{}).
 		Where("status = ? AND paid_at >= ? AND paid_at <= ?", models.SubscriptionPaymentSucceeded, startDate, endDate.Add(24*time.Hour)).
@@ -318,8 +319,30 @@ func GetTotalRevenue(c *gin.Context) {
 		return
 	}
 
-	utils.LogSuccess("Total revenue successfully retrieved in GetTotalRevenue")
-	c.JSON(http.StatusOK, gin.H{"total": total})
+	type DailyData struct {
+		Date   string `json:"date"`
+		Amount int64  `json:"amount"`
+		Count  int64  `json:"count"` 
+	}
+
+	var dailyData []DailyData
+	err = db.DB.Model(&models.SubscriptionPayment{}).
+		Select("DATE(paid_at) as date, SUM(amount) as amount, COUNT(*) as count").
+		Where("status = ? AND paid_at >= ? AND paid_at <= ?", models.SubscriptionPaymentSucceeded, startDate, endDate.Add(24*time.Hour)).
+		Group("DATE(paid_at)").
+		Order("date").
+		Scan(&dailyData).Error
+	if err != nil {
+		utils.LogError(err, "Error fetching daily revenue data in GetTotalRevenue")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error fetching daily revenue data"})
+		return
+	}
+
+	utils.LogSuccess("Total revenue and daily data successfully retrieved in GetTotalRevenue")
+	c.JSON(http.StatusOK, gin.H{
+		"total":      total,
+		"daily_data": dailyData,
+	})
 }
 
 // GetTopContentCreators returns the top 3 content creators with the most active subscriptions (admin only)
