@@ -1698,6 +1698,54 @@ paths:
       summary: Get all reports (Admin only)
       tags:
       - admin
+  /posts/statistics:
+    get:
+      consumes:
+      - application/json
+      description: Get statistics about posts by day and by category
+      parameters:
+      - description: Start date (YYYY-MM-DD)
+        in: query
+        name: start_date
+        required: true
+        type: string
+      - description: End date (YYYY-MM-DD)
+        in: query
+        name: end_date
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 'total: total number of posts, daily_data: array of daily post
+            creation data, category_data: array of posts by category'
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: 'error: Invalid date parameters'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: 'error: Unauthorized'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: 'error: Error retrieving statistics'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get post statistics (Admin)
+      tags:
+      - posts
   /private-messages:
     get:
       consumes:
