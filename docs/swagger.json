@@ -1213,6 +1213,78 @@
                 }
             }
         },
+        "/posts/statistics": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get statistics about posts by day and by category",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "posts"
+                ],
+                "summary": "Get post statistics (Admin)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Start date (YYYY-MM-DD)",
+                        "name": "start_date",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "End date (YYYY-MM-DD)",
+                        "name": "end_date",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "total: total number of posts, daily_data: array of daily post creation data, category_data: array of posts by category",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "error: Invalid date parameters",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "error: Unauthorized",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "error: Error retrieving statistics",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/posts/{id}": {
             "get": {
                 "description": "Retrieve a post by its ID",
@@ -2209,7 +2281,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Returns the total amount of successful subscription payments between two dates (admin only)",
+                "description": "Returns the total amount and daily breakdown of successful subscription payments between two dates (admin only)",
                 "consumes": [
                     "application/json"
                 ],
@@ -2238,7 +2310,7 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "total: total amount in cents",
+                        "description": "total: total amount in cents, daily_data: array of daily revenue data",
                         "schema": {
                             "type": "object",
                             "additionalProperties": true
@@ -3038,7 +3110,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Get count of users by month or year",
+                "description": "Get count of new users by day between start and end dates",
                 "consumes": [
                     "application/json"
                 ],
@@ -3052,36 +3124,29 @@
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Filter type: 'month' or 'year'",
-                        "name": "filter",
+                        "description": "Start date (YYYY-MM-DD)",
+                        "name": "start_date",
                         "in": "query",
                         "required": true
                     },
                     {
-                        "type": "integer",
-                        "description": "Year to filter by (default is current year)",
-                        "name": "year",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "description": "Month to filter by (1-12, only used with 'month' filter)",
-                        "name": "month",
-                        "in": "query"
+                        "type": "string",
+                        "description": "End date (YYYY-MM-DD)",
+                        "name": "end_date",
+                        "in": "query",
+                        "required": true
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "total: total number of users, daily_data: array of daily user registration data",
                         "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/users.UserStatsResponse"
-                            }
+                            "type": "object",
+                            "additionalProperties": true
                         }
                     },
                     "400": {
-                        "description": "error: Invalid filter parameter",
+                        "description": "error: Invalid date parameters",
                         "schema": {
                             "type": "object",
                             "additionalProperties": {
@@ -4205,20 +4270,6 @@
                 "email": {
                     "type": "string",
                     "example": "utilisateur@exemple.com"
-                }
-            }
-        },
-        "users.UserStatsResponse": {
-            "type": "object",
-            "properties": {
-                "count": {
-                    "type": "integer"
-                },
-                "label": {
-                    "type": "string"
-                },
-                "period": {
-                    "type": "string"
                 }
             }
         }
