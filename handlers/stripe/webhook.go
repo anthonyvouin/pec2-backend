@@ -180,7 +180,8 @@ func handleCheckoutSessionCompleted(c *gin.Context, event stripe.Event) {
 func findSubscriptionByCustomer(customerID string, allowMultiple bool) (*models.Subscription, error) {
 	var user models.User
 	if err := db.DB.First(&user, "stripe_customer_id = ?", customerID).Error; err != nil {
-		return nil, fmt.Errorf("user not found")
+		utils.LogError(err, "user not found")
+		return nil, err
 	}
 
 	var sub models.Subscription
@@ -193,7 +194,8 @@ func findSubscriptionByCustomer(customerID string, allowMultiple bool) (*models.
 	}
 
 	if err := query.First(&sub).Error; err != nil {
-		return nil, fmt.Errorf("subscription not found")
+		utils.LogError(err, "Subscription not found")
+		return nil, err
 	}
 
 	return &sub, nil
@@ -219,6 +221,7 @@ func upsertSubscriptionPayment(subscriptionID string, amount int, paymentIntentI
 		// Le paiement existe déjà
 		if payment.Status == models.SubscriptionPaymentSucceeded && status == models.SubscriptionPaymentSucceeded {
 			// Éviter de mettre à jour un paiement déjà réussi
+			utils.LogError(err, "payment already recorded")
 			return fmt.Errorf("payment already recorded")
 		}
 
@@ -241,7 +244,13 @@ func upsertSubscriptionPayment(subscriptionID string, amount int, paymentIntentI
 		StripePaymentIntentId: paymentIntentID,
 		Status:                status,
 	}
-	return db.DB.Create(&payment).Error
+	err2 := db.DB.Create(&payment).Error
+	if err2 != nil {
+		utils.LogError(err2, "can't create subscriptionPayment")
+	}
+
+	utils.LogSuccess(string(payment.Status))
+	return nil
 }
 
 func updateSubscriptionStatus(sub *models.Subscription) {
@@ -297,8 +306,8 @@ func handlePaymentIntentSucceeded(c *gin.Context, event stripe.Event) {
 
 	sub, err := findSubscriptionByCustomer(pi.Customer.ID, true)
 	if err != nil {
-		utils.LogError(err, "Subscription not found, will retry dans handlePaymentIntentSucceeded")
-		c.JSON(http.StatusOK, gin.H{"message": "Subscription not ready, will retry"})
+		utils.LogError(err, "Subscription not found after retries in handlePaymentIntentSucceeded")
+		c.JSON(http.StatusOK, gin.H{"message": "Subscription not ready after retries"})
 		return
 	}
 

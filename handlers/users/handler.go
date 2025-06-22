@@ -278,6 +278,19 @@ func GetUserProfile(c *gin.Context) {
 	c.JSON(http.StatusOK, user)
 }
 
+// @Summary     Find user by userName
+// @Description  Find user by userName
+// @Tags users
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param        username   path      string  true  "search userName"
+// @Success      200  {object}  map[string]interface{}  "User is found"
+// @Failure      400  {object}  map[string]string  "error: Invalid request data"
+// @Failure      401  {object}  map[string]string  "error: Unauthorized"
+// @Failure      404  {object}  map[string]string  "error: User not found"
+// @Failure      500  {object}  map[string]string  "error: Error retrieving profile"
+// @Router       /users/{username} [get]
 func GetUserByUsername(c *gin.Context) {
 	username := c.Param("username")
 	if username == "" {
@@ -770,19 +783,30 @@ func UnfollowUser(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Security BearerAuth
+// @Param userSearch query string  false  "id of user search (not required)"
 // @Success 200 {array} models.User "List of users followed"
 // @Failure 401 {object} map[string]string "error: Unauthorized"
 // @Failure 500 {object} map[string]string "error: Server error"
 // @Router /users/followings [get]
 func GetMyFollowings(c *gin.Context) {
-	userID, exists := c.Get("user_id")
+	userId, exists := c.Get("user_id")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
 		return
 	}
 
+	userSearch := c.Query("userSearch")
+	if userSearch == "" {
+		userSearchStr, ok := userId.(string)
+		if !ok {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid user ID format"})
+			return
+		}
+		userSearch = userSearchStr
+	}
+
 	var follows []models.UserFollow
-	if err := db.DB.Where("follower_id = ?", userID).Find(&follows).Error; err != nil {
+	if err := db.DB.Where("follower_id = ?", userSearch).Find(&follows).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error fetching followings"})
 		return
 	}
@@ -806,18 +830,29 @@ func GetMyFollowings(c *gin.Context) {
 // @Produce json
 // @Security BearerAuth
 // @Success 200 {array} models.User "List of followers"
+// @Param userSearch query string  false  "id of user search (not required)"
 // @Failure 401 {object} map[string]string "error: Unauthorized"
 // @Failure 500 {object} map[string]string "error: Server error"
 // @Router /users/followers [get]
 func GetMyFollowers(c *gin.Context) {
-	userID, exists := c.Get("user_id")
+	userId, exists := c.Get("user_id")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
 		return
 	}
 
+	userSearch := c.Query("userSearch")
+	if userSearch == "" {
+		userSearchStr, ok := userId.(string)
+		if !ok {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid user ID format"})
+			return
+		}
+		userSearch = userSearchStr
+	}
+
 	var follows []models.UserFollow
-	if err := db.DB.Where("followed_id = ?", userID).Find(&follows).Error; err != nil {
+	if err := db.DB.Where("followed_id = ?", userSearch).Find(&follows).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error fetching followers"})
 		return
 	}

@@ -360,6 +360,9 @@ func TestLogin_Success(t *testing.T) {
 		WillReturnRows(mock.NewRows([]string{"id", "email", "password", "email_verified_at"}).
 			AddRow("user-uuid", "user@example.com", "$2a$10$8b9qfHvbQVnP1IgEyd/AX.X5PCNGO/ZVE13NZS8xg3wDo6f4rWpiW", sql.NullTime{Time: now, Valid: true}))
 
+	mock.ExpectQuery(`SELECT \* FROM "user_follows" WHERE follower_id = \$1`).
+		WithArgs("user-uuid").
+		WillReturnRows(mock.NewRows([]string{"follower_id", "followed_id"}))
 	r := testutils.SetupTestRouter()
 	r.POST("/login", Login)
 

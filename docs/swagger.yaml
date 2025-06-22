@@ -1239,6 +1239,14 @@ paths:
         in: query
         name: isFree
         type: boolean
+      - description: Filter by user
+        in: query
+        name: userIs
+        type: boolean
+      - description: Filter by current user following
+        in: query
+        name: homeFeed
+        type: boolean
       - collectionFormat: csv
         description: Filter by category IDs (can provide multiple)
         in: query
@@ -2380,11 +2388,64 @@ paths:
       summary: Follow a user
       tags:
       - users
+  /users/{username}:
+    get:
+      consumes:
+      - application/json
+      description: Find user by userName
+      parameters:
+      - description: search userName
+        in: path
+        name: username
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: User is found
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: 'error: Invalid request data'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: 'error: Unauthorized'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: 'error: User not found'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: 'error: Error retrieving profile'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Find user by userName
+      tags:
+      - users
   /users/followers:
     get:
       consumes:
       - application/json
       description: Liste tous les utilisateurs qui suivent l'utilisateur authentifié
+      parameters:
+      - description: id of user search (not required)
+        in: query
+        name: userSearch
+        type: string
       produces:
       - application/json
       responses:
@@ -2416,6 +2477,11 @@ paths:
       consumes:
       - application/json
       description: List all users that the authenticated user follows
+      parameters:
+      - description: id of user search (not required)
+        in: query
+        name: userSearch
+        type: string
       produces:
       - application/json
       responses:
