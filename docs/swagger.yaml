@@ -1239,6 +1239,14 @@ paths:
         in: query
         name: isFree
         type: boolean
+      - description: Filter by user
+        in: query
+        name: userIs
+        type: boolean
+      - description: Filter by current user following
+        in: query
+        name: homeFeed
+        type: boolean
       - collectionFormat: csv
         description: Filter by category IDs (can provide multiple)
         in: query
