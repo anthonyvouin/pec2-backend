@@ -2562,6 +2562,14 @@ const docTemplate = `{
                     "users"
                 ],
                 "summary": "Liste des followers",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "id of user search (not required)",
+                        "name": "userSearch",
+                        "in": "query"
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "List of followers",
@@ -2611,6 +2619,14 @@ const docTemplate = `{
                     "users"
                 ],
                 "summary": "List of users followed",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "id of user search (not required)",
+                        "name": "userSearch",
+                        "in": "query"
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "List of users followed",
@@ -3363,6 +3379,80 @@ const docTemplate = `{
                     },
                     "500": {
                         "description": "error: Server error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/users/{username}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Find user by userName",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "users"
+                ],
+                "summary": "Find user by userName",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "search userName",
+                        "name": "username",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "User is found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "error: Invalid request data",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "error: Unauthorized",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "error: User not found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "error: Error retrieving profile",
                         "schema": {
                             "type": "object",
                             "additionalProperties": {
