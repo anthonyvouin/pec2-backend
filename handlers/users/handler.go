@@ -2,13 +2,11 @@ package users
 
 import (
 	"errors"
-	"fmt"
 	"net/http"
 	"pec2-backend/db"
 	"pec2-backend/models"
 	"pec2-backend/utils"
 	mailsmodels "pec2-backend/utils/mails-models"
-	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -367,77 +365,95 @@ func GetUserByUsername(c *gin.Context) {
 	})
 }
 
-// UserStatsResponse représente la réponse de statistiques d'utilisateurs
-type UserStatsResponse struct {
-	Period string `json:"period"`
-	Count  int    `json:"count"`
-	Label  string `json:"label"`
-}
-
 // @Summary Get user statistics (Admin)
-// @Description Get count of users by month or year
+// @Description Get count of new users by day between start and end dates
 // @Tags users
 // @Accept json
 // @Produce json
-// @Param filter query string true "Filter type: 'month' or 'year'"
-// @Param year query int false "Year to filter by (default is current year)"
-// @Param month query int false "Month to filter by (1-12, only used with 'month' filter)"
+// @Param start_date query string true "Start date (YYYY-MM-DD)"
+// @Param end_date query string true "End date (YYYY-MM-DD)"
 // @Security BearerAuth
-// @Success 200 {array} UserStatsResponse
-// @Failure 400 {object} map[string]string "error: Invalid filter parameter"
+// @Success 200 {object} map[string]interface{} "total: total number of users, daily_data: array of daily user registration data"
+// @Failure 400 {object} map[string]string "error: Invalid date parameters"
 // @Failure 401 {object} map[string]string "error: Unauthorized"
 // @Failure 500 {object} map[string]string "error: Error retrieving statistics"
 // @Router /users/statistics [get]
 func GetUserStatistics(c *gin.Context) {
-	filter := c.Query("filter")
-	if filter != "month" && filter != "year" {
-		utils.LogError(errors.New("paramètre filter invalide"), "Invalid filter parameter in GetUserStatistics")
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Filter must be 'month' or 'year'"})
+	startDateStr := c.Query("start_date")
+	endDateStr := c.Query("end_date")
+
+	if startDateStr == "" || endDateStr == "" {
+		utils.LogError(nil, "start_date or end_date missing in GetUserStatistics")
+		c.JSON(http.StatusBadRequest, gin.H{"error": "start_date and end_date are required (format YYYY-MM-DD)"})
 		return
 	}
 
-	currentYear := time.Now().Year()
-	yearStr := c.DefaultQuery("year", strconv.Itoa(currentYear))
-	year, err := strconv.Atoi(yearStr)
+	var startDate, endDate time.Time
+	var err error
+
+	formats := []string{"2006-01-02", "2006-01-02T15:04:05Z07:00", "2006-01-02T15:04:05Z"}
+	startDateParsed := false
+
+	for _, format := range formats {
+		startDate, err = time.Parse(format, startDateStr)
+		if err == nil {
+			startDateParsed = true
+			break
+		}
+	}
+
+	if !startDateParsed {
+		utils.LogError(err, "Invalid start_date format in GetUserStatistics: "+startDateStr)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid start_date format (YYYY-MM-DD)"})
+		return
+	}
+
+	endDateParsed := false
+	for _, format := range formats {
+		endDate, err = time.Parse(format, endDateStr)
+		if err == nil {
+			endDateParsed = true
+			break
+		}
+	}
+
+	if !endDateParsed {
+		utils.LogError(err, "Invalid end_date format in GetUserStatistics: "+endDateStr)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid end_date format (YYYY-MM-DD)"})
+		return
+	}
+	if endDate.Before(startDate) {
+		utils.LogError(nil, "end_date before start_date in GetUserStatistics")
+		c.JSON(http.StatusBadRequest, gin.H{"error": "end_date must be after start_date"})
+		return
+	}
+
+	var total int64
+	err = db.DB.Model(&models.User{}).
+		Where("created_at >= ? AND created_at <= ?", startDate, endDate.Add(24*time.Hour)).
+		Count(&total).Error
 	if err != nil {
-		utils.LogError(err, "Invalid year parameter in GetUserStatistics")
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid year parameter"})
+		utils.LogError(err, "Error calculating total user count in GetUserStatistics")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error calculating total user count"})
 		return
 	}
 
-	var stats []UserStatsResponse
+	type DailyData struct {
+		Date  string `json:"date"`
+		Count int64  `json:"count"`
+	}
 
-	if filter == "month" {
-		monthStr := c.Query("month")
-		if monthStr != "" {
-			month, err := strconv.Atoi(monthStr)
-			if err != nil || month < 1 || month > 12 {
-				utils.LogError(errors.New("paramètre month invalide"), "Invalid month parameter in GetUserStatistics")
-				c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid month parameter (must be 1-12)"})
-				return
-			}
-
-			stats, err = getUserCountByDay(year, month)
-			if err != nil {
-				utils.LogError(err, "Error when retrieving daily statistics in GetUserStatistics")
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "Error retrieving daily statistics: " + err.Error()})
-				return
-			}
-		} else {
-			stats, err = getUserCountByMonth(year)
-			if err != nil {
-				utils.LogError(err, "Error when retrieving monthly statistics in GetUserStatistics")
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "Error retrieving monthly statistics: " + err.Error()})
-				return
-			}
-		}
-	} else {
-		stats, err = getUserCountByYear(year)
-		if err != nil {
-			utils.LogError(err, "Error when retrieving yearly statistics in GetUserStatistics")
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Error retrieving yearly statistics: " + err.Error()})
-			return
-		}
+	var dailyData []DailyData
+	err = db.DB.Model(&models.User{}).
+		Select("DATE(created_at) as date, COUNT(*) as count").
+		Where("created_at >= ? AND created_at <= ?", startDate, endDate.Add(24*time.Hour)).
+		Group("DATE(created_at)").
+		Order("date").
+		Scan(&dailyData).Error
+	if err != nil {
+		utils.LogError(err, "Error fetching daily user data in GetUserStatistics")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error fetching daily user data"})
+		return
 	}
 
 	userID, exists := c.Get("user_id")
@@ -445,155 +461,10 @@ func GetUserStatistics(c *gin.Context) {
 		userID = "0"
 	}
 	utils.LogSuccessWithUser(userID, "User statistics retrieved successfully in GetUserStatistics")
-	c.JSON(http.StatusOK, stats)
-}
-
-func getUserCountByDay(year, month int) ([]UserStatsResponse, error) {
-	daysInMonth := 31
-	if month == 4 || month == 6 || month == 9 || month == 11 {
-		daysInMonth = 30
-	} else if month == 2 {
-		if year%4 == 0 && (year%100 != 0 || year%400 == 0) {
-			daysInMonth = 29
-		} else {
-			daysInMonth = 28
-		}
-	}
-
-	var results []UserStatsResponse
-
-	for day := 1; day <= daysInMonth; day++ {
-		currentDate := time.Date(year, time.Month(month), day, 0, 0, 0, 0, time.UTC)
-		nextDate := currentDate.AddDate(0, 0, 1)
-
-		if currentDate.After(time.Now()) {
-			continue
-		}
-
-		var count int64
-		err := db.DB.Model(&models.User{}).
-			Where("created_at >= ? AND created_at < ?", currentDate, nextDate).
-			Count(&count).Error
-
-		if err != nil {
-			return nil, err
-		}
-
-		dayStr := fmt.Sprintf("%02d", day)
-		monthStr := fmt.Sprintf("%02d", month)
-
-		results = append(results, UserStatsResponse{
-			Period: fmt.Sprintf("%d-%s-%s", year, monthStr, dayStr),
-			Count:  int(count),
-			Label:  fmt.Sprintf("%d %s", day, currentDate.Format("Jan")),
-		})
-	}
-
-	return results, nil
-}
-
-func getUserCountByMonth(year int) ([]UserStatsResponse, error) {
-	startDate := time.Date(year, 1, 1, 0, 0, 0, 0, time.UTC)
-
-	if startDate.After(time.Now()) {
-		return []UserStatsResponse{}, nil
-	}
-
-	var results []UserStatsResponse
-
-	for month := 1; month <= 12; month++ {
-		currentDate := time.Date(year, time.Month(month), 1, 0, 0, 0, 0, time.UTC)
-		nextDate := currentDate.AddDate(0, 1, 0)
-
-		if currentDate.After(time.Now()) {
-			continue
-		}
-
-		var count int64
-		err := db.DB.Model(&models.User{}).
-			Where("created_at >= ? AND created_at < ?", currentDate, nextDate).
-			Count(&count).Error
-
-		if err != nil {
-			return nil, err
-		}
-
-		monthName := currentDate.Format("Jan")
-		results = append(results, UserStatsResponse{
-			Period: fmt.Sprintf("%d-%02d", year, month),
-			Count:  int(count),
-			Label:  monthName,
-		})
-	}
-
-	return results, nil
-}
-
-func getUserCountByYear(targetYear int) ([]UserStatsResponse, error) {
-	var oldestUser models.User
-	err := db.DB.Order("created_at ASC").First(&oldestUser).Error
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return []UserStatsResponse{}, nil
-		}
-		return nil, err
-	}
-
-	startYear := oldestUser.CreatedAt.Year()
-	currentYear := time.Now().Year()
-
-	if targetYear > 0 {
-		if targetYear > currentYear {
-			return []UserStatsResponse{}, nil
-		}
-		if targetYear < startYear {
-			return []UserStatsResponse{}, nil
-		}
-
-		startDate := time.Date(targetYear, 1, 1, 0, 0, 0, 0, time.UTC)
-		endDate := time.Date(targetYear+1, 1, 1, 0, 0, 0, 0, time.UTC)
-
-		var count int64
-		err := db.DB.Model(&models.User{}).
-			Where("created_at >= ? AND created_at < ?", startDate, endDate).
-			Count(&count).Error
-
-		if err != nil {
-			return nil, err
-		}
-
-		return []UserStatsResponse{
-			{
-				Period: fmt.Sprintf("%d", targetYear),
-				Count:  int(count),
-				Label:  fmt.Sprintf("%d", targetYear),
-			},
-		}, nil
-	}
-
-	var results []UserStatsResponse
-
-	for year := startYear; year <= currentYear; year++ {
-		startDate := time.Date(year, 1, 1, 0, 0, 0, 0, time.UTC)
-		endDate := time.Date(year+1, 1, 1, 0, 0, 0, 0, time.UTC)
-
-		var count int64
-		err := db.DB.Model(&models.User{}).
-			Where("created_at >= ? AND created_at < ?", startDate, endDate).
-			Count(&count).Error
-
-		if err != nil {
-			return nil, err
-		}
-
-		results = append(results, UserStatsResponse{
-			Period: fmt.Sprintf("%d", year),
-			Count:  int(count),
-			Label:  fmt.Sprintf("%d", year),
-		})
-	}
-
-	return results, nil
+	c.JSON(http.StatusOK, gin.H{
+		"total":      total,
+		"daily_data": dailyData,
+	})
 }
 
 // @Summary Get user role statistics (Admin)
