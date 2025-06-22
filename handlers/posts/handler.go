@@ -133,6 +133,8 @@ func CreatePost(c *gin.Context) {
 // @Tags posts
 // @Produce json
 // @Param isFree query boolean false "Filter by free posts"
+// @Param userIs query boolean false "Filter by user"
+// @Param homeFeed query boolean false "Filter by current user following"
 // @Param categories query []string false "Filter by category IDs (can provide multiple)"
 // @Param limit query integer false "Number of items per page (default: 10)"
 // @Param page query integer false "Page number (default: 1)"
@@ -144,7 +146,6 @@ func GetAllPosts(c *gin.Context) {
 	var posts []models.Post
 	query := db.DB.Preload("Categories").Order("created_at DESC")
 
-	// Filtre pour les posts gratuits/payants
 	if isFree := c.Query("isFree"); isFree != "" {
 		query = query.Where("is_free = ?", isFree == "true")
 	}
@@ -153,7 +154,7 @@ func GetAllPosts(c *gin.Context) {
 		query = query.Where("user_id = ?", userIs)
 	}
 
-	if homeFeed := c.Query("homeFeed"); homeFeed != "" {
+	if c.Query("homeFeed") == "true" {
 		var userFollow []models.UserFollow
 		errUserFollow := db.DB.
 			Where("follower_id = ?", userID).Find(&userFollow).Error
