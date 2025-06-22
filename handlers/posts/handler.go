@@ -189,6 +189,17 @@ func GetAllPosts(c *gin.Context) {
 			Group("posts.id")
 	}
 
+	// Exclure les posts reportés par l'utilisateur connecté
+	if exists && userID != nil {
+		var reportedPostIds []string
+		if err := db.DB.Model(&models.Report{}).
+			Where("reported_by = ?", userID).
+			Pluck("post_id", &reportedPostIds).Error; err == nil && len(reportedPostIds) > 0 {
+			query = query.Where("posts.id NOT IN (?)", reportedPostIds)
+			utils.LogSuccess("Filtered out posts reported by user " + userID.(string))
+		}
+	}
+
 	// Compter le nombre total de posts pour la pagination
 	var total int64
 	if err := query.Model(&models.Post{}).Count(&total).Error; err != nil {
@@ -221,7 +232,7 @@ func GetAllPosts(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error retrieving posts: " + err.Error()})
 		return
 	}
-	
+
 	var response []models.PostResponse = make([]models.PostResponse, 0, len(posts))
 	for _, post := range posts {
 		// Compter le nombre de likes
@@ -237,14 +248,14 @@ func GetAllPosts(c *gin.Context) {
 
 		// Créer la réponse pour ce post
 		postResponse := models.PostResponse{
-			ID:             post.ID,
-			Name:           post.Name,
-			PictureURL:     post.PictureURL,
-			IsFree:         post.IsFree,
-			Enable:         post.Enable,
-			Categories:     post.Categories,
-			CreatedAt:      post.CreatedAt,
-			UpdatedAt:      post.UpdatedAt,
+			ID:         post.ID,
+			Name:       post.Name,
+			PictureURL: post.PictureURL,
+			IsFree:     post.IsFree,
+			Enable:     post.Enable,
+			Categories: post.Categories,
+			CreatedAt:  post.CreatedAt,
+			UpdatedAt:  post.UpdatedAt,
 			User: models.UserInfo{
 				ID:             post.User.ID,
 				UserName:       post.User.UserName,
@@ -254,6 +265,7 @@ func GetAllPosts(c *gin.Context) {
 			CommentsCount:  int(commentsCount),
 			ReportsCount:   int(reportsCount),
 			CommentEnabled: post.User.CommentsEnable,
+			MessageEnabled: post.User.MessageEnable,
 		}
 
 		response = append(response, postResponse)
@@ -290,6 +302,47 @@ func GetPostByID(c *gin.Context) {
 	var post models.Post
 	postID := c.Param("id")
 
+	// Récupérer l'ID utilisateur s'il est connecté
+	userID, exists := c.Get("user_id")
+
+	// Vérifier si l'utilisateur a reporté ce post
+	var userHasReported bool = false
+	var reportCount int64
+	if exists && userID != nil {
+		if err := db.DB.Model(&models.Report{}).
+			Where("post_id = ? AND reported_by = ?", postID, userID).
+			Count(&reportCount).Error; err == nil && reportCount > 0 {
+			userHasReported = true
+			utils.LogSuccess("User " + userID.(string) + " has reported post " + postID)
+		}
+	}
+
+	// Si l'utilisateur a reporté ce post et qu'il n'est pas l'auteur ou un admin, renvoyer une erreur 404
+	if userHasReported && exists && userID != nil {
+		var isAuthorOrAdmin bool = false
+		var userRole string
+		roleInterface, roleExists := c.Get("user_role")
+		if roleExists {
+			userRole = roleInterface.(string)
+		}
+
+		// Vérifier si l'utilisateur est l'auteur du post ou un admin
+		if err := db.DB.Model(&models.Post{}).
+			Where("id = ? AND user_id = ?", postID, userID).
+			Count(&reportCount).Error; err == nil && reportCount > 0 {
+			isAuthorOrAdmin = true
+		} else if userRole == string(models.AdminRole) {
+			isAuthorOrAdmin = true
+		}
+
+		// Si l'utilisateur n'est ni l'auteur, ni un admin, renvoyer 404
+		if !isAuthorOrAdmin {
+			utils.LogError(nil, "Post reported by user, access denied in GetPostByID")
+			c.JSON(http.StatusNotFound, gin.H{"error": "Post not found"})
+			return
+		}
+	}
+
 	if err := db.DB.Preload("Categories").Preload("User").First(&post, "id = ?", postID).Error; err != nil {
 		utils.LogError(err, "Post not found in GetPostByID")
 		c.JSON(http.StatusNotFound, gin.H{"error": "Post not found"})
@@ -309,14 +362,14 @@ func GetPostByID(c *gin.Context) {
 
 	// Créer la réponse pour ce post
 	postResponse := models.PostResponse{
-		ID:             post.ID,
-		Name:           post.Name,
-		PictureURL:     post.PictureURL,
-		IsFree:         post.IsFree,
-		Enable:         post.Enable,
-		Categories:     post.Categories,
-		CreatedAt:      post.CreatedAt,
-		UpdatedAt:      post.UpdatedAt,
+		ID:         post.ID,
+		Name:       post.Name,
+		PictureURL: post.PictureURL,
+		IsFree:     post.IsFree,
+		Enable:     post.Enable,
+		Categories: post.Categories,
+		CreatedAt:  post.CreatedAt,
+		UpdatedAt:  post.UpdatedAt,
 		User: models.UserInfo{
 			ID:             post.User.ID,
 			UserName:       post.User.UserName,
@@ -326,6 +379,7 @@ func GetPostByID(c *gin.Context) {
 		CommentsCount:  int(commentsCount),
 		ReportsCount:   int(reportsCount),
 		CommentEnabled: post.User.CommentsEnable,
+		MessageEnabled: post.User.MessageEnable,
 	}
 
 	utils.LogSuccess("Post retrieved successfully in GetPostByID")
