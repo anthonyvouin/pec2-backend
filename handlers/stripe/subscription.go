@@ -8,6 +8,7 @@ import (
 	"pec2-backend/db"
 	"pec2-backend/models"
 	"pec2-backend/utils"
+	mailsmodels "pec2-backend/utils/mails-models"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -123,13 +124,13 @@ func CreateSubscriptionCheckoutSession(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"sessionId": s.ID, "url": s.URL})
 }
 
-// CancelSubscription cancels a Stripe subscription and updates its status in the database
-// @Summary Cancel a subscription
-// @Description Cancel a Stripe subscription and update its status in the database
+// CancelSubscription cancels a Stripe subscription for a content creator and updates its status in the database
+// @Summary Cancel a subscription for a content creator
+// @Description Cancel a Stripe subscription for a content creator and update its status in the database
 // @Tags subscriptions
 // @Accept json
 // @Produce json
-// @Param subscriptionId path string true "ID of the subscription to cancel"
+// @Param creatorId path string true "ID of the content creator"
 // @Security BearerAuth
 // @Success 200 {object} map[string]string "message: Subscription canceled successfully"
 // @Failure 401 {object} map[string]string "error: Unauthorized"
@@ -141,7 +142,6 @@ func CancelSubscription(c *gin.Context) {
 	stripe.Key = os.Getenv("STRIPE_SECRET_KEY")
 	creatorId := c.Param("creatorId")
 
-	// Validation de l'UUID
 	if _, err := uuid.Parse(creatorId); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid creator ID"})
 		return
@@ -182,6 +182,17 @@ func CancelSubscription(c *gin.Context) {
 		utils.LogErrorWithUser(userID, err, "Erreur lors de la mise à jour du statut dans CancelSubscription")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error when updating the subscription status"})
 		return
+	}
+
+	var creator models.User
+	var user models.User
+
+	if err := db.DB.First(&creator, "id = ?", subscription.ContentCreatorID).Error; err != nil {
+		utils.LogErrorWithUser(userID, err, "Erreur lors de la récupération des infos du créateur dans CancelSubscription")
+	} else if err := db.DB.First(&user, "id = ?", userID).Error; err != nil {
+		utils.LogErrorWithUser(userID, err, "Erreur lors de la récupération des infos de l'utilisateur dans CancelSubscription")
+	} else {
+		go mailsmodels.SubscriptionCancellation(user.Email, creator.UserName)
 	}
 
 	utils.LogSuccessWithUser(userID, "Abonnement annulé avec succès dans CancelSubscription")
