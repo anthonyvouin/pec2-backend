@@ -2355,7 +2355,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Cancel a Stripe subscription and update its status in the database",
+                "description": "Cancel a Stripe subscription for a content creator and update its status in the database",
                 "consumes": [
                     "application/json"
                 ],
@@ -2365,12 +2365,12 @@ const docTemplate = `{
                 "tags": [
                     "subscriptions"
                 ],
-                "summary": "Cancel a subscription",
+                "summary": "Cancel a subscription for a content creator",
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "ID of the subscription to cancel",
-                        "name": "subscriptionId",
+                        "description": "ID of the content creator",
+                        "name": "creatorId",
                         "in": "path",
                         "required": true
                     }
