@@ -30,6 +30,8 @@ func PostsRoutes(r *gin.Engine) { // Routes publiques
 		postsRoutes.PUT("/:id", posts.UpdatePost)
 		postsRoutes.DELETE("/:id", posts.DeletePost)
 
+		postsRoutes.GET("/statistics", middleware.AdminAuth(), posts.GetPostsStatistics)
+
 		// Routes des interactions
 		postsRoutes.POST("/:id/like", likes.ToggleLike)
 		postsRoutes.POST("/:id/report", report.ReportPost)
