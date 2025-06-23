@@ -154,14 +154,15 @@ func handleCheckoutSessionCompleted(c *gin.Context, event stripe.Event) {
 
 	if session.Invoice != nil {
 		utils.LogError(nil, "PaymentIntent présent dans handleCheckoutSessionCompleted")
-		err1 := upsertSubscriptionPayment(sub.ID, int(session.AmountTotal), session.Invoice.ID, models.SubscriptionPaymentPending)
-		if err1 != nil {
-			utils.LogError(err1, "Erreur upsertSubscriptionPayment (pending) dans handleCheckoutSessionCompleted")
-		}
 		if session.PaymentStatus == "paid" {
-			err2 := upsertSubscriptionPayment(sub.ID, int(session.AmountTotal), session.PaymentIntent.ID, models.SubscriptionPaymentSucceeded)
+			err1 := upsertSubscriptionPayment(sub.ID, int(session.AmountTotal), session.PaymentIntent.ID, models.SubscriptionPaymentSucceeded)
+			if err1 != nil {
+				utils.LogError(err1, "Erreur upsertSubscriptionPayment (paid) dans handleCheckoutSessionCompleted")
+			}
+		} else {
+			err2 := upsertSubscriptionPayment(sub.ID, int(session.AmountTotal), session.Invoice.ID, models.SubscriptionPaymentPending)
 			if err2 != nil {
-				utils.LogError(err2, "Erreur upsertSubscriptionPayment (paid) dans handleCheckoutSessionCompleted")
+				utils.LogError(err2, "Erreur upsertSubscriptionPayment (pending) dans handleCheckoutSessionCompleted")
 			}
 		}
 	} else {
