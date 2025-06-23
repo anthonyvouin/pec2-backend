@@ -414,15 +414,3 @@ func checkCommentsEnabled(userID interface{}) (bool, error) {	var user models.Us
 	}
 	return user.CommentsEnable, nil
 }
-
-// Fonction pour vérifier les préférences de commentaires d'un utilisateur
-func getUserCommentsPreference(userID string) (bool, error) {
-	var user models.User
-
-	// Rechercher l'utilisateur
-	if err := db.DB.Where("id = ?", userID).First(&user).Error; err != nil {
-		return false, err
-	}
-
-	return user.CommentsEnable, nil
-}

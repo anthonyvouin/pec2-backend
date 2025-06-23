@@ -18,6 +18,7 @@ import (
 // @Accept multipart/form-data
 // @Produce json
 // @Param name formData string true "Post name"
+// @Param description formData string false "Post description"
 // @Param isFree formData boolean false "Is the post free"
 // @Param enable formData boolean false "Is the post enabled"
 // @Param categories formData []string false "Category IDs"
@@ -69,12 +70,14 @@ func CreatePost(c *gin.Context) {
 			}
 		}
 	}
-
+	description := c.Request.FormValue("description")
+	
 	post := models.Post{
-		UserID: userID.(string),
-		Name:   name,
-		IsFree: isFree,
-		Enable: true,
+		UserID:      userID.(string),
+		Name:        name,
+		Description: description,
+		IsFree:      isFree,
+		Enable:      true,
 	}
 
 	file, err := c.FormFile("postPicture")
@@ -248,9 +251,7 @@ func GetAllPosts(c *gin.Context) {
 
 		// Créer la réponse pour ce post
 		postResponse := models.PostResponse{
-			ID:         post.ID,
-			Name:       post.Name,
-			PictureURL: post.PictureURL,
+			ID: post.ID, Name: post.Name, Description: post.Description, PictureURL: post.PictureURL,
 			IsFree:     post.IsFree,
 			Enable:     post.Enable,
 			Categories: post.Categories,
@@ -362,9 +363,7 @@ func GetPostByID(c *gin.Context) {
 
 	// Créer la réponse pour ce post
 	postResponse := models.PostResponse{
-		ID:         post.ID,
-		Name:       post.Name,
-		PictureURL: post.PictureURL,
+		ID: post.ID, Name: post.Name, Description: post.Description, PictureURL: post.PictureURL,
 		IsFree:     post.IsFree,
 		Enable:     post.Enable,
 		Categories: post.Categories,
@@ -393,6 +392,7 @@ func GetPostByID(c *gin.Context) {
 // @Produce json
 // @Param id path string true "Post ID"
 // @Param name formData string false "Post name"
+// @Param description formData string false "Post description"
 // @Param isFree formData boolean false "Is the post free"
 // @Param enable formData boolean false "Is the post enabled"
 // @Param categories formData []string false "Category IDs"
@@ -428,14 +428,18 @@ func UpdatePost(c *gin.Context) {
 		c.JSON(http.StatusForbidden, gin.H{"error": "Not authorized to update this post"})
 		return
 	}
-
 	name := c.Request.FormValue("name")
+	description := c.Request.FormValue("description")
 	isFreeStr := c.Request.FormValue("isFree")
 	enableStr := c.Request.FormValue("enable")
 	categoriesStr := c.Request.FormValue("categories")
 
 	if name != "" {
 		post.Name = name
+	}
+	
+	if description != "" {
+		post.Description = description
 	}
 
 	if isFreeStr != "" {
@@ -550,3 +554,4 @@ func DeletePost(c *gin.Context) {
 	utils.LogSuccess("Post deleted successfully in DeletePost")
 	c.JSON(http.StatusOK, gin.H{"message": "Post deleted successfully"})
 }
+
