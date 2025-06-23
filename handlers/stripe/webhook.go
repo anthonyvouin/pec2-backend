@@ -119,42 +119,42 @@ func handleCheckoutSessionCompleted(c *gin.Context, event stripe.Event) {
 		}
 	}
 
-	var dup models.Subscription
-	if err := db.DB.Where("user_id = ? AND content_creator_id = ? AND status IN ?",
-		user.ID, creator.ID,
-		[]models.SubscriptionStatus{models.SubscriptionPending, models.SubscriptionActive}).
-		First(&dup).Error; err == nil {
-		utils.LogError(nil, "Local subscription already exists dans handleCheckoutSessionCompleted")
-		c.JSON(http.StatusOK, gin.H{"message": "Local subscription already exists"})
-		return
-	}
-
-	now := time.Now()
-	end := now.AddDate(0, 1, 0)
-
 	initialStatus := models.SubscriptionPending
 	if session.PaymentStatus == "paid" {
 		initialStatus = models.SubscriptionActive
 	}
 
-	sub := models.Subscription{
-		UserID:               user.ID,
-		ContentCreatorID:     creator.ID,
-		Status:               initialStatus,
-		StripeSubscriptionId: stripeSubID,
-		StartDate:            now,
-		EndDate:              &end,
+	var sub models.Subscription
+	if err := db.DB.Where("user_id = ? AND content_creator_id = ? AND status IN ?",
+		user.ID, creator.ID,
+		[]models.SubscriptionStatus{models.SubscriptionPending, models.SubscriptionActive}).
+		First(&sub).Error; err == nil {
+		utils.LogError(nil, "Local subscription already exists dans handleCheckoutSessionCompleted")
+		// c.JSON(http.StatusOK, gin.H{"message": "Local subscription already exists"})
+		// return
+	} else {
+		now := time.Now()
+		end := now.AddDate(0, 1, 0)
+
+		sub = models.Subscription{
+			UserID:               user.ID,
+			ContentCreatorID:     creator.ID,
+			Status:               initialStatus,
+			StripeSubscriptionId: stripeSubID,
+			StartDate:            now,
+			EndDate:              &end,
+		}
+
+		if err := db.DB.Create(&sub).Error; err != nil {
+			utils.LogError(err, "Error creating subscription dans handleCheckoutSessionCompleted")
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Error creating subscription"})
+			return
+		}
 	}
 
-	if err := db.DB.Create(&sub).Error; err != nil {
-		utils.LogError(err, "Error creating subscription dans handleCheckoutSessionCompleted")
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error creating subscription"})
-		return
-	}
-
-	if session.PaymentIntent != nil {
+	if session.Invoice != nil {
 		utils.LogError(nil, "PaymentIntent présent dans handleCheckoutSessionCompleted")
-		err1 := upsertSubscriptionPayment(sub.ID, int(session.AmountTotal), session.PaymentIntent.ID, models.SubscriptionPaymentPending)
+		err1 := upsertSubscriptionPayment(sub.ID, int(session.AmountTotal), session.Invoice.ID, models.SubscriptionPaymentPending)
 		if err1 != nil {
 			utils.LogError(err1, "Erreur upsertSubscriptionPayment (pending) dans handleCheckoutSessionCompleted")
 		}
@@ -165,7 +165,7 @@ func handleCheckoutSessionCompleted(c *gin.Context, event stripe.Event) {
 			}
 		}
 	} else {
-		utils.LogError(nil, "Pas de PaymentIntent dans la session dans handleCheckoutSessionCompleted")
+		utils.LogError(nil, "Pas d'invoice dans la session dans handleCheckoutSessionCompleted")
 	}
 
 	if initialStatus == models.SubscriptionActive {
@@ -209,13 +209,13 @@ func findSubscriptionByStripeID(stripeSubID string) (*models.Subscription, error
 	return &sub, nil
 }
 
-func upsertSubscriptionPayment(subscriptionID string, amount int, paymentIntentID string, status models.SubscriptionPaymentStatus) error {
-	if paymentIntentID == "" {
+func upsertSubscriptionPayment(subscriptionID string, amount int, invoiceID string, status models.SubscriptionPaymentStatus) error {
+	if invoiceID == "" {
 		return nil
 	}
 
 	var payment models.SubscriptionPayment
-	err := db.DB.First(&payment, "stripe_payment_intent_id = ?", paymentIntentID).Error
+	err := db.DB.First(&payment, "stripe_payment_intent_id = ?", invoiceID).Error
 
 	if err == nil {
 		// Le paiement existe déjà
@@ -241,7 +241,7 @@ func upsertSubscriptionPayment(subscriptionID string, amount int, paymentIntentI
 		SubscriptionID:        subscriptionID,
 		Amount:                amount,
 		PaidAt:                time.Now(),
-		StripePaymentIntentId: paymentIntentID,
+		StripePaymentIntentId: invoiceID,
 		Status:                status,
 	}
 	err2 := db.DB.Create(&payment).Error
