@@ -405,12 +405,3 @@ func broadcastComment(postID string, comment SSEComment) {
 		}
 	}
 }
-
-// Fonction auxiliaire pour vérifier si les commentaires sont activés pour un utilisateur
-func checkCommentsEnabled(userID interface{}) (bool, error) {	var user models.User
-	if err := db.DB.Where("id = ?", userID).First(&user).Error; err != nil {
-		// Si l'utilisateur n'existe pas, on considère que les commentaires sont activés par défaut
-		return true, err
-	}
-	return user.CommentsEnable, nil
-}
