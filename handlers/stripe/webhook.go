@@ -290,43 +290,43 @@ func handlePaymentIntentProcessing(c *gin.Context, event stripe.Event) {
 	c.JSON(http.StatusOK, gin.H{"message": "PaymentIntent processing - logged"})
 }
 
-func handlePaymentIntentSucceeded(c *gin.Context, event stripe.Event) {
-	var pi stripe.PaymentIntent
-	if err := json.Unmarshal(event.Data.Raw, &pi); err != nil {
-		utils.LogError(err, "Error parsing PaymentIntent succeeded dans handlePaymentIntentSucceeded")
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Error parsing PaymentIntent succeeded"})
-		return
-	}
+// func handlePaymentIntentSucceeded(c *gin.Context, event stripe.Event) {
+// 	var pi stripe.PaymentIntent
+// 	if err := json.Unmarshal(event.Data.Raw, &pi); err != nil {
+// 		utils.LogError(err, "Error parsing PaymentIntent succeeded dans handlePaymentIntentSucceeded")
+// 		c.JSON(http.StatusBadRequest, gin.H{"error": "Error parsing PaymentIntent succeeded"})
+// 		return
+// 	}
 
-	if pi.Customer == nil || pi.ID == "" {
-		utils.LogError(nil, "PaymentIntent missing customer or ID dans handlePaymentIntentSucceeded")
-		c.JSON(http.StatusBadRequest, gin.H{"error": "PaymentIntent missing customer or ID"})
-		return
-	}
+// 	if pi.Customer == nil || pi.ID == "" {
+// 		utils.LogError(nil, "PaymentIntent missing customer or ID dans handlePaymentIntentSucceeded")
+// 		c.JSON(http.StatusBadRequest, gin.H{"error": "PaymentIntent missing customer or ID"})
+// 		return
+// 	}
 
-	sub, err := findSubscriptionByCustomer(pi.Customer.ID, true)
-	if err != nil {
-		utils.LogError(err, "Subscription not found after retries in handlePaymentIntentSucceeded")
-		c.JSON(http.StatusOK, gin.H{"message": "Subscription not ready after retries"})
-		return
-	}
+// 	sub, err := findSubscriptionByCustomer(pi.Customer.ID, true)
+// 	if err != nil {
+// 		utils.LogError(err, "Subscription not found after retries in handlePaymentIntentSucceeded")
+// 		c.JSON(http.StatusOK, gin.H{"message": "Subscription not ready after retries"})
+// 		return
+// 	}
 
-	if err := upsertSubscriptionPayment(sub.ID, int(pi.AmountReceived), pi.ID, models.SubscriptionPaymentSucceeded); err != nil {
-		if err.Error() == "payment already recorded" {
-			utils.LogError(err, "Payment already recorded dans handlePaymentIntentSucceeded")
-			c.JSON(http.StatusOK, gin.H{"message": "Payment already recorded"})
-			return
-		}
-		utils.LogError(err, "Error creating payment dans handlePaymentIntentSucceeded")
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error creating payment"})
-		return
-	}
+// 	if err := upsertSubscriptionPayment(sub.ID, int(pi.AmountReceived), pi.ID, models.SubscriptionPaymentSucceeded); err != nil {
+// 		if err.Error() == "payment already recorded" {
+// 			utils.LogError(err, "Payment already recorded dans handlePaymentIntentSucceeded")
+// 			c.JSON(http.StatusOK, gin.H{"message": "Payment already recorded"})
+// 			return
+// 		}
+// 		utils.LogError(err, "Error creating payment dans handlePaymentIntentSucceeded")
+// 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error creating payment"})
+// 		return
+// 	}
 
-	utils.LogSuccess("Subscription activated via payment_intent.succeeded dans handlePaymentIntentSucceeded")
-	updateSubscriptionStatus(sub)
+// 	utils.LogSuccess("Subscription activated via payment_intent.succeeded dans handlePaymentIntentSucceeded")
+// 	updateSubscriptionStatus(sub)
 
-	c.JSON(http.StatusOK, gin.H{"message": "Subscription activated via payment_intent.succeeded"})
-}
+// 	c.JSON(http.StatusOK, gin.H{"message": "Subscription activated via payment_intent.succeeded"})
+// }
 
 func handlePaymentIntentFailed(c *gin.Context, event stripe.Event) {
 	var pi stripe.PaymentIntent
