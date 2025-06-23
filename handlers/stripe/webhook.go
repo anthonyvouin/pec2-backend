@@ -51,8 +51,8 @@ func StripeWebhookHandler(c *gin.Context) {
 		handlePaymentIntentCreated(c, event)
 	case "payment_intent.processing":
 		handlePaymentIntentProcessing(c, event)
-	case "payment_intent.succeeded":
-		handlePaymentIntentSucceeded(c, event)
+	// case "payment_intent.succeeded":
+	// 	handlePaymentIntentSucceeded(c, event)
 	case "payment_intent.failed":
 		handlePaymentIntentFailed(c, event)
 	case "payment_intent.canceled":
