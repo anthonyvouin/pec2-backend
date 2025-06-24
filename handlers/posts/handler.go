@@ -19,6 +19,7 @@ import (
 // @Accept multipart/form-data
 // @Produce json
 // @Param name formData string true "Post name"
+// @Param description formData string false "Post description"
 // @Param isFree formData boolean false "Is the post free"
 // @Param enable formData boolean false "Is the post enabled"
 // @Param categories formData []string false "Category IDs"
@@ -70,12 +71,14 @@ func CreatePost(c *gin.Context) {
 			}
 		}
 	}
-
+	description := c.Request.FormValue("description")
+	
 	post := models.Post{
-		UserID: userID.(string),
-		Name:   name,
-		IsFree: isFree,
-		Enable: true,
+		UserID:      userID.(string),
+		Name:        name,
+		Description: description,
+		IsFree:      isFree,
+		Enable:      true,
 	}
 
 	file, err := c.FormFile("postPicture")
@@ -191,6 +194,17 @@ func GetAllPosts(c *gin.Context) {
 			Group("posts.id")
 	}
 
+	// Exclure les posts reportés par l'utilisateur connecté
+	if exists && userID != nil {
+		var reportedPostIds []string
+		if err := db.DB.Model(&models.Report{}).
+			Where("reported_by = ?", userID).
+			Pluck("post_id", &reportedPostIds).Error; err == nil && len(reportedPostIds) > 0 {
+			query = query.Where("posts.id NOT IN (?)", reportedPostIds)
+			utils.LogSuccess("Filtered out posts reported by user " + userID.(string))
+		}
+	}
+
 	// Compter le nombre total de posts pour la pagination
 	var total int64
 	if err := query.Model(&models.Post{}).Count(&total).Error; err != nil {
@@ -218,12 +232,12 @@ func GetAllPosts(c *gin.Context) {
 
 	offset := (page - 1) * limit
 	query = query.Limit(limit).Offset(offset)
-
 	if err := query.Find(&posts).Error; err != nil {
 		utils.LogError(err, "Error retrieving posts in GetAllPosts")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error retrieving posts: " + err.Error()})
 		return
 	}
+
 	var response []models.PostResponse = make([]models.PostResponse, 0, len(posts))
 	for _, post := range posts {
 		// Compter le nombre de likes
@@ -239,9 +253,7 @@ func GetAllPosts(c *gin.Context) {
 
 		// Créer la réponse pour ce post
 		postResponse := models.PostResponse{
-			ID:         post.ID,
-			Name:       post.Name,
-			PictureURL: post.PictureURL,
+			ID: post.ID, Name: post.Name, Description: post.Description, PictureURL: post.PictureURL,
 			IsFree:     post.IsFree,
 			Enable:     post.Enable,
 			Categories: post.Categories,
@@ -252,9 +264,11 @@ func GetAllPosts(c *gin.Context) {
 				UserName:       post.User.UserName,
 				ProfilePicture: post.User.ProfilePicture,
 			},
-			LikesCount:    int(likesCount),
-			CommentsCount: int(commentsCount),
-			ReportsCount:  int(reportsCount),
+			LikesCount:     int(likesCount),
+			CommentsCount:  int(commentsCount),
+			ReportsCount:   int(reportsCount),
+			CommentEnabled: post.User.CommentsEnable,
+			MessageEnabled: post.User.MessageEnable,
 		}
 
 		response = append(response, postResponse)
@@ -291,6 +305,47 @@ func GetPostByID(c *gin.Context) {
 	var post models.Post
 	postID := c.Param("id")
 
+	// Récupérer l'ID utilisateur s'il est connecté
+	userID, exists := c.Get("user_id")
+
+	// Vérifier si l'utilisateur a reporté ce post
+	var userHasReported bool = false
+	var reportCount int64
+	if exists && userID != nil {
+		if err := db.DB.Model(&models.Report{}).
+			Where("post_id = ? AND reported_by = ?", postID, userID).
+			Count(&reportCount).Error; err == nil && reportCount > 0 {
+			userHasReported = true
+			utils.LogSuccess("User " + userID.(string) + " has reported post " + postID)
+		}
+	}
+
+	// Si l'utilisateur a reporté ce post et qu'il n'est pas l'auteur ou un admin, renvoyer une erreur 404
+	if userHasReported && exists && userID != nil {
+		var isAuthorOrAdmin bool = false
+		var userRole string
+		roleInterface, roleExists := c.Get("user_role")
+		if roleExists {
+			userRole = roleInterface.(string)
+		}
+
+		// Vérifier si l'utilisateur est l'auteur du post ou un admin
+		if err := db.DB.Model(&models.Post{}).
+			Where("id = ? AND user_id = ?", postID, userID).
+			Count(&reportCount).Error; err == nil && reportCount > 0 {
+			isAuthorOrAdmin = true
+		} else if userRole == string(models.AdminRole) {
+			isAuthorOrAdmin = true
+		}
+
+		// Si l'utilisateur n'est ni l'auteur, ni un admin, renvoyer 404
+		if !isAuthorOrAdmin {
+			utils.LogError(nil, "Post reported by user, access denied in GetPostByID")
+			c.JSON(http.StatusNotFound, gin.H{"error": "Post not found"})
+			return
+		}
+	}
+
 	if err := db.DB.Preload("Categories").Preload("User").First(&post, "id = ?", postID).Error; err != nil {
 		utils.LogError(err, "Post not found in GetPostByID")
 		c.JSON(http.StatusNotFound, gin.H{"error": "Post not found"})
@@ -304,16 +359,13 @@ func GetPostByID(c *gin.Context) {
 	// Compter le nombre de commentaires
 	var commentsCount int64
 	db.DB.Model(&models.Comment{}).Where("post_id = ?", post.ID).Count(&commentsCount)
-
 	// Compter le nombre de reports
 	var reportsCount int64
 	db.DB.Model(&models.Report{}).Where("post_id = ?", post.ID).Count(&reportsCount)
 
 	// Créer la réponse pour ce post
 	postResponse := models.PostResponse{
-		ID:         post.ID,
-		Name:       post.Name,
-		PictureURL: post.PictureURL,
+		ID: post.ID, Name: post.Name, Description: post.Description, PictureURL: post.PictureURL,
 		IsFree:     post.IsFree,
 		Enable:     post.Enable,
 		Categories: post.Categories,
@@ -324,9 +376,11 @@ func GetPostByID(c *gin.Context) {
 			UserName:       post.User.UserName,
 			ProfilePicture: post.User.ProfilePicture,
 		},
-		LikesCount:    int(likesCount),
-		CommentsCount: int(commentsCount),
-		ReportsCount:  int(reportsCount),
+		LikesCount:     int(likesCount),
+		CommentsCount:  int(commentsCount),
+		ReportsCount:   int(reportsCount),
+		CommentEnabled: post.User.CommentsEnable,
+		MessageEnabled: post.User.MessageEnable,
 	}
 
 	utils.LogSuccess("Post retrieved successfully in GetPostByID")
@@ -340,6 +394,7 @@ func GetPostByID(c *gin.Context) {
 // @Produce json
 // @Param id path string true "Post ID"
 // @Param name formData string false "Post name"
+// @Param description formData string false "Post description"
 // @Param isFree formData boolean false "Is the post free"
 // @Param enable formData boolean false "Is the post enabled"
 // @Param categories formData []string false "Category IDs"
@@ -375,14 +430,18 @@ func UpdatePost(c *gin.Context) {
 		c.JSON(http.StatusForbidden, gin.H{"error": "Not authorized to update this post"})
 		return
 	}
-
 	name := c.Request.FormValue("name")
+	description := c.Request.FormValue("description")
 	isFreeStr := c.Request.FormValue("isFree")
 	enableStr := c.Request.FormValue("enable")
 	categoriesStr := c.Request.FormValue("categories")
 
 	if name != "" {
 		post.Name = name
+	}
+	
+	if description != "" {
+		post.Description = description
 	}
 
 	if isFreeStr != "" {

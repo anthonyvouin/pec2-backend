@@ -102,12 +102,13 @@ func GetUserMessages(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error retrieving messages: " + result.Error.Error()})
 		return
 	}
-
 	type EnhancedMessage struct {
 		models.PrivateMessage
-		SenderName    string `json:"senderName"`
-		ReceiverName  string `json:"receiverName"`
-		IsCurrentUser bool   `json:"isCurrentUser"`
+		SenderName          string `json:"senderName"`
+		ReceiverName        string `json:"receiverName"`
+		IsCurrentUser       bool   `json:"isCurrentUser"`
+		SenderMessageEnable bool   `json:"senderMessageEnable"`
+		ReceiverMessageEnable bool `json:"receiverMessageEnable"`
 	}
 
 	var enhancedMessages []EnhancedMessage
@@ -115,15 +116,17 @@ func GetUserMessages(c *gin.Context) {
 	for _, msg := range messages {
 		var sender, receiver models.User
 
-		db.DB.Select("user_name").Where("id = ?", msg.SenderID).First(&sender)
+		db.DB.Select("user_name, message_enable").Where("id = ?", msg.SenderID).First(&sender)
 
-		db.DB.Select("user_name").Where("id = ?", msg.ReceiverID).First(&receiver)
+		db.DB.Select("user_name, message_enable").Where("id = ?", msg.ReceiverID).First(&receiver)
 
 		enhancedMsg := EnhancedMessage{
 			PrivateMessage: msg,
 			SenderName:     sender.UserName,
 			ReceiverName:   receiver.UserName,
 			IsCurrentUser:  msg.SenderID == userID.(string),
+			SenderMessageEnable: sender.MessageEnable,
+			ReceiverMessageEnable: receiver.MessageEnable,
 		}
 
 		enhancedMessages = append(enhancedMessages, enhancedMsg)
