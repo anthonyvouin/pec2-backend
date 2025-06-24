@@ -8,6 +8,7 @@ import (
 	"pec2-backend/db"
 	"pec2-backend/models"
 	"pec2-backend/utils"
+	mailsmodels "pec2-backend/utils/mails-models"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -129,13 +130,13 @@ func CreateSubscriptionCheckoutSession(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"sessionId": s.ID, "url": s.URL})
 }
 
-// CancelSubscription cancels a Stripe subscription and updates its status in the database
-// @Summary Cancel a subscription
-// @Description Cancel a Stripe subscription and update its status in the database
+// CancelSubscription cancels a Stripe subscription for a content creator and updates its status in the database
+// @Summary Cancel a subscription for a content creator
+// @Description Cancel a Stripe subscription for a content creator and update its status in the database
 // @Tags subscriptions
 // @Accept json
 // @Produce json
-// @Param subscriptionId path string true "ID of the subscription to cancel"
+// @Param creatorId path string true "ID of the content creator"
 // @Security BearerAuth
 // @Success 200 {object} map[string]string "message: Subscription canceled successfully"
 // @Failure 401 {object} map[string]string "error: Unauthorized"
@@ -147,7 +148,6 @@ func CancelSubscription(c *gin.Context) {
 	stripe.Key = os.Getenv("STRIPE_SECRET_KEY")
 	creatorId := c.Param("creatorId")
 
-	// Validation de l'UUID
 	if _, err := uuid.Parse(creatorId); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid creator ID"})
 		return
@@ -188,6 +188,17 @@ func CancelSubscription(c *gin.Context) {
 		utils.LogErrorWithUser(userID, err, "Erreur lors de la mise à jour du statut dans CancelSubscription")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error when updating the subscription status"})
 		return
+	}
+
+	var creator models.User
+	var user models.User
+
+	if err := db.DB.First(&creator, "id = ?", subscription.ContentCreatorID).Error; err != nil {
+		utils.LogErrorWithUser(userID, err, "Erreur lors de la récupération des infos du créateur dans CancelSubscription")
+	} else if err := db.DB.First(&user, "id = ?", userID).Error; err != nil {
+		utils.LogErrorWithUser(userID, err, "Erreur lors de la récupération des infos de l'utilisateur dans CancelSubscription")
+	} else {
+		go mailsmodels.SubscriptionCancellation(user.Email, creator.UserName)
 	}
 
 	utils.LogSuccessWithUser(userID, "Abonnement annulé avec succès dans CancelSubscription")
@@ -272,14 +283,14 @@ func GetSubscriptionDetail(c *gin.Context) {
 
 // GetTotalRevenue allows an admin to retrieve the total sum of payments over a given period (admin only)
 // @Summary Get the total revenue of the site
-// @Description Returns the total amount of successful subscription payments between two dates (admin only)
+// @Description Returns the total amount and daily breakdown of successful subscription payments between two dates (admin only)
 // @Tags subscriptions
 // @Accept json
 // @Produce json
 // @Param start_date query string true "Start date (YYYY-MM-DD)"
 // @Param end_date query string true "End date (YYYY-MM-DD)"
 // @Security BearerAuth
-// @Success 200 {object} map[string]interface{} "total: total amount in cents"
+// @Success 200 {object} map[string]interface{} "total: total amount in cents, daily_data: array of daily revenue data"
 // @Failure 400 {object} map[string]string "error: Invalid input"
 // @Failure 401 {object} map[string]string "error: Unauthorized"
 // @Failure 403 {object} map[string]string "error: Access denied"
@@ -295,15 +306,39 @@ func GetTotalRevenue(c *gin.Context) {
 		return
 	}
 
-	startDate, err := time.Parse("2006-01-02", startDateStr)
-	if err != nil {
-		utils.LogError(err, "Invalid start_date format in GetTotalRevenue")
+	// Correction du format de date pour supporter le format YYYY-MM-DD
+	var startDate, endDate time.Time
+	var err error
+
+	// Essayer différents formats de date
+	formats := []string{"2006-01-02", "2006-01-02T15:04:05Z07:00", "2006-01-02T15:04:05Z"}
+	startDateParsed := false
+
+	for _, format := range formats {
+		startDate, err = time.Parse(format, startDateStr)
+		if err == nil {
+			startDateParsed = true
+			break
+		}
+	}
+
+	if !startDateParsed {
+		utils.LogError(err, "Invalid start_date format in GetTotalRevenue: "+startDateStr)
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid start_date format (YYYY-MM-DD)"})
 		return
 	}
-	endDate, err := time.Parse("2006-01-02", endDateStr)
-	if err != nil {
-		utils.LogError(err, "Invalid end_date format in GetTotalRevenue")
+
+	endDateParsed := false
+	for _, format := range formats {
+		endDate, err = time.Parse(format, endDateStr)
+		if err == nil {
+			endDateParsed = true
+			break
+		}
+	}
+
+	if !endDateParsed {
+		utils.LogError(err, "Invalid end_date format in GetTotalRevenue: "+endDateStr)
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid end_date format (YYYY-MM-DD)"})
 		return
 	}
@@ -313,6 +348,7 @@ func GetTotalRevenue(c *gin.Context) {
 		return
 	}
 
+	// Calcul du montant total
 	var total int64
 	err = db.DB.Model(&models.SubscriptionPayment{}).
 		Where("status = ? AND paid_at >= ? AND paid_at <= ?", models.SubscriptionPaymentSucceeded, startDate, endDate.Add(24*time.Hour)).
@@ -324,8 +360,30 @@ func GetTotalRevenue(c *gin.Context) {
 		return
 	}
 
-	utils.LogSuccess("Total revenue successfully retrieved in GetTotalRevenue")
-	c.JSON(http.StatusOK, gin.H{"total": total})
+	type DailyData struct {
+		Date   string `json:"date"`
+		Amount int64  `json:"amount"`
+		Count  int64  `json:"count"`
+	}
+
+	var dailyData []DailyData
+	err = db.DB.Model(&models.SubscriptionPayment{}).
+		Select("DATE(paid_at) as date, SUM(amount) as amount, COUNT(*) as count").
+		Where("status = ? AND paid_at >= ? AND paid_at <= ?", models.SubscriptionPaymentSucceeded, startDate, endDate.Add(24*time.Hour)).
+		Group("DATE(paid_at)").
+		Order("date").
+		Scan(&dailyData).Error
+	if err != nil {
+		utils.LogError(err, "Error fetching daily revenue data in GetTotalRevenue")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error fetching daily revenue data"})
+		return
+	}
+
+	utils.LogSuccess("Total revenue and daily data successfully retrieved in GetTotalRevenue")
+	c.JSON(http.StatusOK, gin.H{
+		"total":      total,
+		"daily_data": dailyData,
+	})
 }
 
 // GetTopContentCreators returns the top 3 content creators with the most active subscriptions (admin only)

@@ -313,10 +313,32 @@ func Login(c *gin.Context) {
 	if userID == "" {
 		userID = "0"
 	}
+
+	var findFollowings []models.UserFollow
+
+	resultFollow := db.DB.
+		Where("follower_id = ?", userID).
+		Find(&findFollowings)
+
+	if resultFollow.Error != nil {
+		utils.LogError(resultFollow.Error, "Erreur lors de la récupération des followings")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error"})
+		return
+	}
+
+	var followingIds []string
+
+	if len(findFollowings) > 0 {
+		for _, follow := range findFollowings {
+			followingIds = append(followingIds, follow.FollowedID) // adapt type si nécessaire
+		}
+	}
+
 	utils.LogSuccessWithUser(userID, "User login successfully in Login")
 	c.JSON(http.StatusOK, gin.H{
-		"token": token,
-		"user":  user,
+		"token":     token,
+		"user":      user,
+		"following": followingIds,
 	})
 }
 

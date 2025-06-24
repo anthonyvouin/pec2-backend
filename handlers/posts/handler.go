@@ -8,6 +8,7 @@ import (
 	"pec2-backend/models"
 	"pec2-backend/utils"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -135,6 +136,8 @@ func CreatePost(c *gin.Context) {
 // @Tags posts
 // @Produce json
 // @Param isFree query boolean false "Filter by free posts"
+// @Param userIs query boolean false "Filter by user"
+// @Param homeFeed query boolean false "Filter by current user following"
 // @Param categories query []string false "Filter by category IDs (can provide multiple)"
 // @Param limit query integer false "Number of items per page (default: 10)"
 // @Param page query integer false "Page number (default: 1)"
@@ -146,7 +149,6 @@ func GetAllPosts(c *gin.Context) {
 	var posts []models.Post
 	query := db.DB.Preload("Categories").Order("created_at DESC")
 
-	// Filtre pour les posts gratuits/payants
 	if isFree := c.Query("isFree"); isFree != "" {
 		query = query.Where("is_free = ?", isFree == "true")
 	}
@@ -155,7 +157,7 @@ func GetAllPosts(c *gin.Context) {
 		query = query.Where("user_id = ?", userIs)
 	}
 
-	if homeFeed := c.Query("homeFeed"); homeFeed != "" {
+	if c.Query("homeFeed") == "true" {
 		var userFollow []models.UserFollow
 		errUserFollow := db.DB.
 			Where("follower_id = ?", userID).Find(&userFollow).Error
@@ -555,3 +557,130 @@ func DeletePost(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Post deleted successfully"})
 }
 
+// @Summary Get post statistics (Admin)
+// @Description Get statistics about posts by day and by category
+// @Tags posts
+// @Accept json
+// @Produce json
+// @Param start_date query string true "Start date (YYYY-MM-DD)"
+// @Param end_date query string true "End date (YYYY-MM-DD)"
+// @Security BearerAuth
+// @Success 200 {object} map[string]interface{} "total: total number of posts, daily_data: array of daily post creation data, category_data: array of posts by category"
+// @Failure 400 {object} map[string]string "error: Invalid date parameters"
+// @Failure 401 {object} map[string]string "error: Unauthorized"
+// @Failure 500 {object} map[string]string "error: Error retrieving statistics"
+// @Router /posts/statistics [get]
+func GetPostsStatistics(c *gin.Context) {
+	startDateStr := c.Query("start_date")
+	endDateStr := c.Query("end_date")
+
+	if startDateStr == "" || endDateStr == "" {
+		utils.LogError(nil, "start_date or end_date missing in GetPostsStatistics")
+		c.JSON(http.StatusBadRequest, gin.H{"error": "start_date and end_date are required (format YYYY-MM-DD)"})
+		return
+	}
+
+	var startDate, endDate time.Time
+	var err error
+
+	formats := []string{"2006-01-02", "2006-01-02T15:04:05Z07:00", "2006-01-02T15:04:05Z"}
+	startDateParsed := false
+
+	for _, format := range formats {
+		startDate, err = time.Parse(format, startDateStr)
+		if err == nil {
+			startDateParsed = true
+			break
+		}
+	}
+
+	if !startDateParsed {
+		utils.LogError(err, "Invalid start_date format in GetPostsStatistics: "+startDateStr)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid start_date format (YYYY-MM-DD)"})
+		return
+	}
+
+	endDateParsed := false
+	for _, format := range formats {
+		endDate, err = time.Parse(format, endDateStr)
+		if err == nil {
+			endDateParsed = true
+			break
+		}
+	}
+
+	if !endDateParsed {
+		utils.LogError(err, "Invalid end_date format in GetPostsStatistics: "+endDateStr)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid end_date format (YYYY-MM-DD)"})
+		return
+	}
+
+	if endDate.Before(startDate) {
+		utils.LogError(nil, "end_date before start_date in GetPostsStatistics")
+		c.JSON(http.StatusBadRequest, gin.H{"error": "end_date must be after start_date"})
+		return
+	}
+
+	// Calcul du nombre total de posts créés dans la période
+	var total int64
+	err = db.DB.Model(&models.Post{}).
+		Where("created_at >= ? AND created_at <= ?", startDate, endDate.Add(24*time.Hour)).
+		Count(&total).Error
+	if err != nil {
+		utils.LogError(err, "Error calculating total post count in GetPostsStatistics")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error calculating total post count"})
+		return
+	}
+
+	// Récupération des données quotidiennes pour le graphique
+	type DailyData struct {
+		Date  string `json:"date"`
+		Count int64  `json:"count"`
+	}
+
+	var dailyData []DailyData
+	err = db.DB.Model(&models.Post{}).
+		Select("DATE(created_at) as date, COUNT(*) as count").
+		Where("created_at >= ? AND created_at <= ?", startDate, endDate.Add(24*time.Hour)).
+		Group("DATE(created_at)").
+		Order("date").
+		Scan(&dailyData).Error
+	if err != nil {
+		utils.LogError(err, "Error fetching daily post data in GetPostsStatistics")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error fetching daily post data"})
+		return
+	}
+
+	// Récupération des données par catégorie
+	type CategoryData struct {
+		CategoryID   string `json:"category_id"`
+		CategoryName string `json:"category_name"`
+		Count        int64  `json:"count"`
+	}
+
+	var categoryData []CategoryData
+	err = db.DB.Table("categories").
+		Select("categories.id as category_id, categories.name as category_name, COUNT(post_categories.post_id) as count").
+		Joins("LEFT JOIN post_categories ON categories.id = post_categories.category_id").
+		Joins("LEFT JOIN posts ON post_categories.post_id = posts.id").
+		Where("posts.created_at >= ? AND posts.created_at <= ?", startDate, endDate.Add(24*time.Hour)).
+		Group("categories.id, categories.name").
+		Order("count DESC").
+		Scan(&categoryData).Error
+	if err != nil {
+		utils.LogError(err, "Error fetching category post data in GetPostsStatistics")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error fetching category post data"})
+		return
+	}
+
+	userID, exists := c.Get("user_id")
+	if !exists {
+		userID = "0"
+	}
+	utils.LogSuccessWithUser(userID, "Post statistics retrieved successfully in GetPostsStatistics")
+	c.JSON(http.StatusOK, gin.H{
+		"total":         total,
+		"daily_data":    dailyData,
+		"category_data": categoryData,
+	})
+}

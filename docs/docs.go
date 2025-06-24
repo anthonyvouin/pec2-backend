@@ -1032,6 +1032,18 @@ const docTemplate = `{
                         "in": "query"
                     },
                     {
+                        "type": "boolean",
+                        "description": "Filter by user",
+                        "name": "userIs",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "Filter by current user following",
+                        "name": "homeFeed",
+                        "in": "query"
+                    },
+                    {
                         "type": "array",
                         "items": {
                             "type": "string"
@@ -1209,6 +1221,78 @@ const docTemplate = `{
                     },
                     "500": {
                         "description": "error: Error message",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/posts/statistics": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get statistics about posts by day and by category",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "posts"
+                ],
+                "summary": "Get post statistics (Admin)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Start date (YYYY-MM-DD)",
+                        "name": "start_date",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "End date (YYYY-MM-DD)",
+                        "name": "end_date",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "total: total number of posts, daily_data: array of daily post creation data, category_data: array of posts by category",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "error: Invalid date parameters",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "error: Unauthorized",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "error: Error retrieving statistics",
                         "schema": {
                             "type": "object",
                             "additionalProperties": {
@@ -2215,7 +2299,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Returns the total amount of successful subscription payments between two dates (admin only)",
+                "description": "Returns the total amount and daily breakdown of successful subscription payments between two dates (admin only)",
                 "consumes": [
                     "application/json"
                 ],
@@ -2244,7 +2328,7 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "total: total amount in cents",
+                        "description": "total: total amount in cents, daily_data: array of daily revenue data",
                         "schema": {
                             "type": "object",
                             "additionalProperties": true
@@ -2355,7 +2439,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Cancel a Stripe subscription and update its status in the database",
+                "description": "Cancel a Stripe subscription for a content creator and update its status in the database",
                 "consumes": [
                     "application/json"
                 ],
@@ -2365,12 +2449,12 @@ const docTemplate = `{
                 "tags": [
                     "subscriptions"
                 ],
-                "summary": "Cancel a subscription",
+                "summary": "Cancel a subscription for a content creator",
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "ID of the subscription to cancel",
-                        "name": "subscriptionId",
+                        "description": "ID of the content creator",
+                        "name": "creatorId",
                         "in": "path",
                         "required": true
                     }
@@ -2562,6 +2646,14 @@ const docTemplate = `{
                     "users"
                 ],
                 "summary": "Liste des followers",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "id of user search (not required)",
+                        "name": "userSearch",
+                        "in": "query"
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "List of followers",
@@ -2611,6 +2703,14 @@ const docTemplate = `{
                     "users"
                 ],
                 "summary": "List of users followed",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "id of user search (not required)",
+                        "name": "userSearch",
+                        "in": "query"
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "List of users followed",
@@ -3044,7 +3144,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Get count of users by month or year",
+                "description": "Get count of new users by day between start and end dates",
                 "consumes": [
                     "application/json"
                 ],
@@ -3058,36 +3158,29 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Filter type: 'month' or 'year'",
-                        "name": "filter",
+                        "description": "Start date (YYYY-MM-DD)",
+                        "name": "start_date",
                         "in": "query",
                         "required": true
                     },
                     {
-                        "type": "integer",
-                        "description": "Year to filter by (default is current year)",
-                        "name": "year",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "description": "Month to filter by (1-12, only used with 'month' filter)",
-                        "name": "month",
-                        "in": "query"
+                        "type": "string",
+                        "description": "End date (YYYY-MM-DD)",
+                        "name": "end_date",
+                        "in": "query",
+                        "required": true
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "total: total number of users, daily_data: array of daily user registration data",
                         "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/users.UserStatsResponse"
-                            }
+                            "type": "object",
+                            "additionalProperties": true
                         }
                     },
                     "400": {
-                        "description": "error: Invalid filter parameter",
+                        "description": "error: Invalid date parameters",
                         "schema": {
                             "type": "object",
                             "additionalProperties": {
@@ -3363,6 +3456,80 @@ const docTemplate = `{
                     },
                     "500": {
                         "description": "error: Server error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/users/{username}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Find user by userName",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "users"
+                ],
+                "summary": "Find user by userName",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "search userName",
+                        "name": "username",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "User is found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "error: Invalid request data",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "error: Unauthorized",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "error: User not found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "error: Error retrieving profile",
                         "schema": {
                             "type": "object",
                             "additionalProperties": {
@@ -4211,20 +4378,6 @@ const docTemplate = `{
                 "email": {
                     "type": "string",
                     "example": "utilisateur@exemple.com"
-                }
-            }
-        },
-        "users.UserStatsResponse": {
-            "type": "object",
-            "properties": {
-                "count": {
-                    "type": "integer"
-                },
-                "label": {
-                    "type": "string"
-                },
-                "period": {
-                    "type": "string"
                 }
             }
         }

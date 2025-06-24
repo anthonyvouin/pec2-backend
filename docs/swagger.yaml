@@ -553,15 +553,6 @@ definitions:
         example: utilisateur@exemple.com
         type: string
     type: object
-  users.UserStatsResponse:
-    properties:
-      count:
-        type: integer
-      label:
-        type: string
-      period:
-        type: string
-    type: object
 host: localhost:8090
 info:
   contact: {}
@@ -1248,6 +1239,14 @@ paths:
         in: query
         name: isFree
         type: boolean
+      - description: Filter by user
+        in: query
+        name: userIs
+        type: boolean
+      - description: Filter by current user following
+        in: query
+        name: homeFeed
+        type: boolean
       - collectionFormat: csv
         description: Filter by category IDs (can provide multiple)
         in: query
@@ -1707,6 +1706,54 @@ paths:
       summary: Get all reports (Admin only)
       tags:
       - admin
+  /posts/statistics:
+    get:
+      consumes:
+      - application/json
+      description: Get statistics about posts by day and by category
+      parameters:
+      - description: Start date (YYYY-MM-DD)
+        in: query
+        name: start_date
+        required: true
+        type: string
+      - description: End date (YYYY-MM-DD)
+        in: query
+        name: end_date
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 'total: total number of posts, daily_data: array of daily post
+            creation data, category_data: array of posts by category'
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: 'error: Invalid date parameters'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: 'error: Unauthorized'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: 'error: Error retrieving statistics'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get post statistics (Admin)
+      tags:
+      - posts
   /private-messages:
     get:
       consumes:
@@ -1970,11 +2017,12 @@ paths:
     delete:
       consumes:
       - application/json
-      description: Cancel a Stripe subscription and update its status in the database
+      description: Cancel a Stripe subscription for a content creator and update its
+        status in the database
       parameters:
-      - description: ID of the subscription to cancel
+      - description: ID of the content creator
         in: path
-        name: subscriptionId
+        name: creatorId
         required: true
         type: string
       produces:
@@ -2012,7 +2060,7 @@ paths:
             type: object
       security:
       - BearerAuth: []
-      summary: Cancel a subscription
+      summary: Cancel a subscription for a content creator
       tags:
       - subscriptions
   /subscriptions/{subscriptionId}:
@@ -2111,8 +2159,8 @@ paths:
     get:
       consumes:
       - application/json
-      description: Returns the total amount of successful subscription payments between
-        two dates (admin only)
+      description: Returns the total amount and daily breakdown of successful subscription
+        payments between two dates (admin only)
       parameters:
       - description: Start date (YYYY-MM-DD)
         in: query
@@ -2128,7 +2176,8 @@ paths:
       - application/json
       responses:
         "200":
-          description: 'total: total amount in cents'
+          description: 'total: total amount in cents, daily_data: array of daily revenue
+            data'
           schema:
             additionalProperties: true
             type: object
@@ -2339,11 +2388,64 @@ paths:
       summary: Follow a user
       tags:
       - users
+  /users/{username}:
+    get:
+      consumes:
+      - application/json
+      description: Find user by userName
+      parameters:
+      - description: search userName
+        in: path
+        name: username
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: User is found
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: 'error: Invalid request data'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: 'error: Unauthorized'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: 'error: User not found'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: 'error: Error retrieving profile'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Find user by userName
+      tags:
+      - users
   /users/followers:
     get:
       consumes:
       - application/json
       description: Liste tous les utilisateurs qui suivent l'utilisateur authentifié
+      parameters:
+      - description: id of user search (not required)
+        in: query
+        name: userSearch
+        type: string
       produces:
       - application/json
       responses:
@@ -2375,6 +2477,11 @@ paths:
       consumes:
       - application/json
       description: List all users that the authenticated user follows
+      parameters:
+      - description: id of user search (not required)
+        in: query
+        name: userSearch
+        type: string
       produces:
       - application/json
       responses:
@@ -2664,32 +2771,29 @@ paths:
     get:
       consumes:
       - application/json
-      description: Get count of users by month or year
+      description: Get count of new users by day between start and end dates
       parameters:
-      - description: 'Filter type: ''month'' or ''year'''
+      - description: Start date (YYYY-MM-DD)
         in: query
-        name: filter
+        name: start_date
         required: true
         type: string
-      - description: Year to filter by (default is current year)
+      - description: End date (YYYY-MM-DD)
         in: query
-        name: year
-        type: integer
-      - description: Month to filter by (1-12, only used with 'month' filter)
-        in: query
-        name: month
-        type: integer
+        name: end_date
+        required: true
+        type: string
       produces:
       - application/json
       responses:
         "200":
-          description: OK
+          description: 'total: total number of users, daily_data: array of daily user
+            registration data'
           schema:
-            items:
-              $ref: '#/definitions/users.UserStatsResponse'
-            type: array
+            additionalProperties: true
+            type: object
         "400":
-          description: 'error: Invalid filter parameter'
+          description: 'error: Invalid date parameters'
           schema:
             additionalProperties:
               type: string
