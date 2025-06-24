@@ -376,53 +376,29 @@ func UpdatePost(c *gin.Context) {
 		return
 	}
 
-	name := c.Request.FormValue("name")
-	isFreeStr := c.Request.FormValue("isFree")
-	enableStr := c.Request.FormValue("enable")
-	categoriesStr := c.Request.FormValue("categories")
-
-	if name != "" {
-		post.Name = name
+	var input models.PostUpdate
+	if err := c.ShouldBindJSON(&input); err != nil {
+		utils.LogError(err, "Invalid JSON in UpdatePost")
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
+		return
 	}
 
-	if isFreeStr != "" {
-		post.IsFree = isFreeStr == "true"
+	post.Name = input.Name
+	post.IsFree = input.IsFree
+
+	categoryIDs := input.Categories
+	var categories []models.Category
+	if err := db.DB.Where("id IN ?", categoryIDs).Find(&categories).Error; err != nil {
+		utils.LogError(err, "Error finding categories in UpdatePost")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error finding categories: " + err.Error()})
+		return
 	}
 
-	if enableStr != "" {
-		post.Enable = enableStr == "true"
-	}
-
-	file, err := c.FormFile("file")
-	if err == nil && file != nil {
-		if post.PictureURL != "" {
-			_ = utils.DeleteImage(post.PictureURL)
-		}
-
-		imageURL, err := utils.UploadImage(file, "post_pictures", "post")
-		if err != nil {
-			utils.LogError(err, "Error uploading picture in UpdatePost")
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Error uploading picture: " + err.Error()})
+	if len(categories) > 0 {
+		if err := db.DB.Model(&post).Association("Categories").Replace(&categories); err != nil {
+			utils.LogError(err, "Error updating categories in UpdatePost")
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Error updating categories: " + err.Error()})
 			return
-		}
-		post.PictureURL = imageURL
-	}
-
-	if categoriesStr != "" {
-		categoryIDs := strings.Split(categoriesStr, ",")
-		var categories []models.Category
-		if err := db.DB.Where("id IN ?", categoryIDs).Find(&categories).Error; err != nil {
-			utils.LogError(err, "Error finding categories in UpdatePost")
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Error finding categories: " + err.Error()})
-			return
-		}
-
-		if len(categories) > 0 {
-			if err := db.DB.Model(&post).Association("Categories").Replace(&categories); err != nil {
-				utils.LogError(err, "Error updating categories in UpdatePost")
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "Error updating categories: " + err.Error()})
-				return
-			}
 		}
 	}
 

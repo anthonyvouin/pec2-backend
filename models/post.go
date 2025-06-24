@@ -31,7 +31,7 @@ type PostUpdate struct {
 	Name       string   `json:"name"`
 	IsFree     bool     `json:"isFree"`
 	Categories []string `json:"categories"`
-	Enable     bool     `json:"enable"`
+	Enable     *bool    `json:"enable"`
 }
 
 type PostResponse struct {
