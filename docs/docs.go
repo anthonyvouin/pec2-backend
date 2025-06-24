@@ -174,10 +174,9 @@ const docTemplate = `{
                     },
                     {
                         "type": "file",
-                        "description": "Category picture",
+                        "description": "Category picture (optional)",
                         "name": "picture",
-                        "in": "formData",
-                        "required": true
+                        "in": "formData"
                     }
                 ],
                 "responses": {

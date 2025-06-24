@@ -197,7 +197,7 @@ func DeleteCategory(c *gin.Context) {
 // @Produce json
 // @Param id path string true "Category ID"
 // @Param name formData string true "Category name"
-// @Param picture formData file true "Category picture"
+// @Param picture formData file false "Category picture (optional)"
 // @Security BearerAuth
 // @Success 200 {object} models.Category
 // @Failure 400 {object} map[string]string "error: Invalid input"
@@ -245,10 +245,6 @@ func UpdateCategory(c *gin.Context) {
 			return
 		}
 		category.PictureURL = imageURL
-	} else {
-		utils.LogError(errors.New("picture manquante"), "Picture is required dans UpdateCategory")
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Picture is required"})
-		return
 	}
 
 	result = db.DB.Save(&category)

@@ -696,10 +696,9 @@ paths:
         name: name
         required: true
         type: string
-      - description: Category picture
+      - description: Category picture (optional)
         in: formData
         name: picture
-        required: true
         type: file
       produces:
       - application/json
