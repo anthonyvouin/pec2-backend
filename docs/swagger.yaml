@@ -232,6 +232,8 @@ definitions:
         type: string
       deletedAt:
         type: string
+      description:
+        type: string
       enable:
         type: boolean
       id:
@@ -265,9 +267,13 @@ definitions:
         items:
           $ref: '#/definitions/models.Category'
         type: array
+      commentEnabled:
+        type: boolean
       commentsCount:
         type: integer
       createdAt:
+        type: string
+      description:
         type: string
       enable:
         type: boolean
@@ -277,6 +283,8 @@ definitions:
         type: boolean
       likesCount:
         type: integer
+      messageEnabled:
+        type: boolean
       name:
         type: string
       pictureUrl:
@@ -532,6 +540,24 @@ definitions:
         type: string
       userName:
         type: string
+    type: object
+  user_settings.UpdateSettingsRequest:
+    properties:
+      commentEnabled:
+        type: boolean
+      messageEnabled:
+        type: boolean
+      subscriptionEnabled:
+        type: boolean
+    type: object
+  user_settings.UserSettingsResponse:
+    properties:
+      commentEnabled:
+        type: boolean
+      messageEnabled:
+        type: boolean
+      subscriptionEnabled:
+        type: boolean
     type: object
   users.PasswordResetConfirm:
     description: Email, code et nouveau mot de passe pour confirmer la réinitialisation
@@ -1289,6 +1315,10 @@ paths:
         name: name
         required: true
         type: string
+      - description: Post description
+        in: formData
+        name: description
+        type: string
       - description: Is the post free
         in: formData
         name: isFree
@@ -1422,6 +1452,10 @@ paths:
       - description: Post name
         in: formData
         name: name
+        type: string
+      - description: Post description
+        in: formData
+        name: description
         type: string
       - description: Is the post free
         in: formData
@@ -2249,6 +2283,82 @@ paths:
       summary: Get top 3 content creators by active subscriptions
       tags:
       - subscriptions
+  /user-settings:
+    get:
+      consumes:
+      - application/json
+      description: Retrieves the settings for the authenticated user
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/user_settings.UserSettingsResponse'
+        "401":
+          description: 'error: Unauthorized'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: 'error: User not found'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: 'error: error message'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get user settings
+      tags:
+      - user-settings
+    put:
+      consumes:
+      - application/json
+      description: Updates the settings for the authenticated user
+      parameters:
+      - description: Settings to update
+        in: body
+        name: settings
+        required: true
+        schema:
+          $ref: '#/definitions/user_settings.UpdateSettingsRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/user_settings.UserSettingsResponse'
+        "400":
+          description: 'error: Bad request'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: 'error: Unauthorized'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: 'error: error message'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Update user settings
+      tags:
+      - user-settings
   /users:
     get:
       consumes:
