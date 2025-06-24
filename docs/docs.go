@@ -1110,6 +1110,12 @@ const docTemplate = `{
                         "required": true
                     },
                     {
+                        "type": "string",
+                        "description": "Post description",
+                        "name": "description",
+                        "in": "formData"
+                    },
+                    {
                         "type": "boolean",
                         "description": "Is the post free",
                         "name": "isFree",
@@ -1377,6 +1383,12 @@ const docTemplate = `{
                         "type": "string",
                         "description": "Post name",
                         "name": "name",
+                        "in": "formData"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Post description",
+                        "name": "description",
                         "in": "formData"
                     },
                     {
@@ -2561,6 +2573,125 @@ const docTemplate = `{
                     },
                     "404": {
                         "description": "error: Subscription not found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/user-settings": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Retrieves the settings for the authenticated user",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "user-settings"
+                ],
+                "summary": "Get user settings",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/user_settings.UserSettingsResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "error: Unauthorized",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "error: User not found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "error: error message",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Updates the settings for the authenticated user",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "user-settings"
+                ],
+                "summary": "Update user settings",
+                "parameters": [
+                    {
+                        "description": "Settings to update",
+                        "name": "settings",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/user_settings.UpdateSettingsRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/user_settings.UserSettingsResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "error: Bad request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "error: Unauthorized",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "error: error message",
                         "schema": {
                             "type": "object",
                             "additionalProperties": {
@@ -3925,6 +4056,9 @@ const docTemplate = `{
                 "deletedAt": {
                     "type": "string"
                 },
+                "description": {
+                    "type": "string"
+                },
                 "enable": {
                     "type": "boolean"
                 },
@@ -3972,10 +4106,16 @@ const docTemplate = `{
                         "$ref": "#/definitions/models.Category"
                     }
                 },
+                "commentEnabled": {
+                    "type": "boolean"
+                },
                 "commentsCount": {
                     "type": "integer"
                 },
                 "createdAt": {
+                    "type": "string"
+                },
+                "description": {
                     "type": "string"
                 },
                 "enable": {
@@ -3989,6 +4129,9 @@ const docTemplate = `{
                 },
                 "likesCount": {
                     "type": "integer"
+                },
+                "messageEnabled": {
+                    "type": "boolean"
                 },
                 "name": {
                     "type": "string"
@@ -4349,6 +4492,34 @@ const docTemplate = `{
                 },
                 "userName": {
                     "type": "string"
+                }
+            }
+        },
+        "user_settings.UpdateSettingsRequest": {
+            "type": "object",
+            "properties": {
+                "commentEnabled": {
+                    "type": "boolean"
+                },
+                "messageEnabled": {
+                    "type": "boolean"
+                },
+                "subscriptionEnabled": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "user_settings.UserSettingsResponse": {
+            "type": "object",
+            "properties": {
+                "commentEnabled": {
+                    "type": "boolean"
+                },
+                "messageEnabled": {
+                    "type": "boolean"
+                },
+                "subscriptionEnabled": {
+                    "type": "boolean"
                 }
             }
         },
