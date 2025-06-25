@@ -138,6 +138,7 @@ func CreatePost(c *gin.Context) {
 // @Param isFree query boolean false "Filter by free posts"
 // @Param userIs query boolean false "Filter by user"
 // @Param homeFeed query boolean false "Filter by current user following"
+// @Param subscriptionFeed query boolean false "Filter by current user active subscriptions"
 // @Param categories query []string false "Filter by category IDs (can provide multiple)"
 // @Param limit query integer false "Number of items per page (default: 10)"
 // @Param page query integer false "Page number (default: 1)"
@@ -180,6 +181,39 @@ func GetAllPosts(c *gin.Context) {
 			}
 		} else {
 			query = query.Where("1 = 0")
+		}
+	}
+	// Filtrer par abonnements actifs de l'utilisateur
+	if c.Query("subscriptionFeed") == "true" && exists {
+		utils.LogSuccess("Filtering by subscriptions for user: " + userID.(string))
+		var subscriptions []models.Subscription
+		if err := db.DB.Where("user_id = ? AND status = ?", userID, models.SubscriptionActive).Find(&subscriptions).Error; err != nil {
+			utils.LogError(err, "Error finding user subscriptions in GetAllPosts")
+		}
+
+		utils.LogSuccess(fmt.Sprintf("Found %d active subscriptions for user %s", len(subscriptions), userID))
+
+		if len(subscriptions) > 0 {
+			var creatorIDs []string
+			for _, sub := range subscriptions {
+				if sub.ContentCreatorID != "" {
+					creatorIDs = append(creatorIDs, sub.ContentCreatorID)
+					utils.LogSuccess(fmt.Sprintf("User %s is subscribed to creator %s", userID, sub.ContentCreatorID))
+				}
+			}
+
+			if len(creatorIDs) > 0 {
+				query = query.Where("user_id IN ? AND is_free = ?", creatorIDs, false)
+				utils.LogSuccess(fmt.Sprintf("Filtering for %d creators with paid posts", len(creatorIDs)))
+			} else {
+				// Si aucun abonnement actif, ne retourner aucun post
+				query = query.Where("1 = 0")
+				utils.LogSuccess("No valid creator IDs found, returning no posts")
+			}
+		} else {
+			// Si aucun abonnement actif, ne retourner aucun post
+			query = query.Where("1 = 0")
+			utils.LogSuccess("No active subscriptions found, returning no posts")
 		}
 	}
 
