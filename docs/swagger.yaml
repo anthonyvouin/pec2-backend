@@ -1272,6 +1272,10 @@ paths:
         in: query
         name: homeFeed
         type: boolean
+      - description: Filter by current user active subscriptions
+        in: query
+        name: subscriptionFeed
+        type: boolean
       - collectionFormat: csv
         description: Filter by category IDs (can provide multiple)
         in: query

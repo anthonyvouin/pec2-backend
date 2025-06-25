@@ -7,6 +7,8 @@ import (
 	"pec2-backend/models"
 	"pec2-backend/utils"
 	mailsmodels "pec2-backend/utils/mails-models"
+	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -428,4 +430,185 @@ func UpdateContentCreatorStatus(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Status updated successfully",
 	})
+}
+
+func GetCreatorStats(c *gin.Context) {
+	isSubscriberSearchStr := c.Query("isSubscriberSearch")
+	isSubscriberSearch, err := strconv.ParseBool(isSubscriberSearchStr)
+	if err != nil {
+		isSubscriberSearch = false
+	}
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+
+	var user models.User
+	if err := db.DB.First(&user, "id = ?", userID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		return
+	}
+
+	subscribersOrFollowers := getSubscribersOrFollowers(userID, isSubscriberSearch)
+	agePercents := getSubscriberAge(subscribersOrFollowers)
+	genderPercents := getSubscriberGender(subscribersOrFollowers)
+
+	c.JSON(http.StatusOK, gin.H{
+		"subscribersOrFollowers": subscribersOrFollowers,
+		"subscriberLength":       len(subscribersOrFollowers),
+		"gender":                 genderPercents,
+		"subscriberAge":          agePercents,
+	})
+
+}
+
+func getSubscriberGender(listUsers []models.LiteUser) map[string]float64 {
+	genderCounts := map[string]int{
+		"femme": 0,
+		"homme": 0,
+		"autre": 0,
+	}
+
+	for _, user := range listUsers {
+		switch user.Sexe {
+		case "WOMAN":
+			genderCounts["femme"]++
+		case "MAN":
+			genderCounts["homme"]++
+		default:
+			genderCounts["autre"]++
+		}
+	}
+
+	totalCountGender := 0
+	for _, count := range genderCounts {
+		totalCountGender += count
+	}
+
+	genderPercents := map[string]float64{}
+	for key, count := range genderCounts {
+		if totalCountGender == 0 {
+			genderPercents[key] = 0.0
+		} else {
+			genderPercents[key] = (float64(count) / float64(totalCountGender)) * 100
+		}
+	}
+	return genderPercents
+}
+
+func getSubscriberAge(listUsers []models.LiteUser) map[string]float64 {
+	subscriberAge := map[string]int{
+		"under18":        0,
+		"between18And25": 0,
+		"between26And40": 0,
+		"over40":         0,
+	}
+
+	for _, user := range listUsers {
+		age := calculateAge(user.BirthDayDate)
+
+		switch {
+		case age < 18:
+			subscriberAge["under18"]++
+		case age <= 25:
+			subscriberAge["between18And25"]++
+		case age <= 40:
+			subscriberAge["between26And40"]++
+		default:
+			subscriberAge["over40"]++
+		}
+	}
+	totalCountAge := 0
+	for _, count := range subscriberAge {
+		totalCountAge += count
+	}
+
+	agePercents := map[string]float64{}
+	for key, count := range subscriberAge {
+		if totalCountAge == 0 {
+			agePercents[key] = 0.0
+		} else {
+			agePercents[key] = (float64(count) / float64(totalCountAge)) * 100
+		}
+	}
+	return agePercents
+}
+
+func calculateAge(birthDate time.Time) int {
+	now := time.Now()
+	years := now.Year() - birthDate.Year()
+	if now.YearDay() < birthDate.YearDay() {
+		years--
+	}
+	return years
+}
+
+func getSubscribersOrFollowers(userID any, isSubscriberSearch bool) []models.LiteUser {
+
+	if isSubscriberSearch {
+		var subscriptions []models.Subscription
+		errSub := db.DB.
+			Where("content_creator_id = ?", userID).
+			Preload("User").
+			Find(&subscriptions).Error
+		if errSub != nil {
+			utils.LogError(errSub, "Error when getList subscribers id")
+		}
+
+		return getSearchSubscribersUser(subscriptions)
+
+	} else {
+		var followers []models.UserFollow
+		errSub := db.DB.
+			Where("followed_id = ?", userID).
+			Preload("Follower").
+			Find(&followers).Error
+		if errSub != nil {
+			utils.LogError(errSub, "Error when getList subscribers id")
+		}
+
+		return getSearchFollowersUser(followers)
+	}
+
+}
+
+func getSearchSubscribersUser(usersList []models.Subscription) []models.LiteUser {
+	var subscribers []models.LiteUser
+	seen2 := make(map[string]bool)
+
+	for _, sub := range usersList {
+		user := sub.User
+		if !seen2[user.ID] {
+			seen2[user.ID] = true
+			subscribers = append(subscribers, models.LiteUser{
+				ID:             user.ID,
+				UserName:       user.UserName,
+				ProfilePicture: user.ProfilePicture,
+				BirthDayDate:   user.BirthDayDate,
+				Sexe:           user.Sexe,
+			})
+		}
+	}
+	return subscribers
+}
+
+func getSearchFollowersUser(usersList []models.UserFollow) []models.LiteUser {
+	var followers []models.LiteUser
+	seen2 := make(map[string]bool)
+
+	for _, sub := range usersList {
+		user := sub.Follower
+		if !seen2[user.ID] {
+			seen2[user.ID] = true
+			followers = append(followers, models.LiteUser{
+				ID:             user.ID,
+				UserName:       user.UserName,
+				ProfilePicture: user.ProfilePicture,
+				BirthDayDate:   user.BirthDayDate,
+				Sexe:           user.Sexe,
+			})
+		}
+	}
+	return followers
 }
