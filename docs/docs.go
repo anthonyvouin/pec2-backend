@@ -2285,11 +2285,12 @@ const docTemplate = `{
                 "summary": "List the user's subscriptions",
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "List of simplified subscriptions",
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/models.Subscription"
+                                "type": "object",
+                                "additionalProperties": true
                             }
                         }
                     },

@@ -57,13 +57,14 @@ func CreateSubscriptionCheckoutSession(c *gin.Context) {
 	if err != nil {
 		utils.LogErrorWithUser(userID, err, "Content creator not found dans CreateSubscriptionCheckoutSession")
 		c.JSON(http.StatusNotFound, gin.H{"error": "Content creator not found"})
-		return	}
+		return
+	}
 	if creator.Role != models.ContentCreator {
 		utils.LogErrorWithUser(userID, nil, "Can only subscribe to a content creator dans CreateSubscriptionCheckoutSession")
 		c.JSON(http.StatusForbidden, gin.H{"error": "Can only subscribe to a content creator"})
 		return
 	}
-	
+
 	// Vérifier si le créateur de contenu a activé les abonnements
 	if !creator.SubscriptionEnable {
 		utils.LogErrorWithUser(userID, nil, "Ce créateur de contenu a désactivé les abonnements dans CreateSubscriptionCheckoutSession")
@@ -212,7 +213,7 @@ func CancelSubscription(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Security BearerAuth
-// @Success 200 {array} models.Subscription
+// @Success 200 {array} map[string]interface{} "List of simplified subscriptions"
 // @Failure 401 {object} map[string]string "error: Unauthorized"
 // @Router /subscriptions [get]
 func GetUserSubscriptions(c *gin.Context) {
@@ -231,8 +232,32 @@ func GetUserSubscriptions(c *gin.Context) {
 		return
 	}
 
+	var simplifiedSubscriptions []map[string]interface{}
+
+	for _, subscription := range subscriptions {
+		var creator models.User
+		if err := db.DB.Select("id, user_name, profile_picture").Where("id = ?", subscription.ContentCreatorID).First(&creator).Error; err != nil {
+			continue
+		}
+
+		simplifiedSub := map[string]interface{}{
+			"id":        subscription.ID,
+			"status":    subscription.Status,
+			"startDate": subscription.StartDate,
+			"endDate":   subscription.EndDate,
+			"createdAt": subscription.CreatedAt,
+			"creator": map[string]interface{}{
+				"id":             creator.ID,
+				"userName":       creator.UserName,
+				"profilePicture": creator.ProfilePicture,
+			},
+		}
+
+		simplifiedSubscriptions = append(simplifiedSubscriptions, simplifiedSub)
+	}
+
 	utils.LogSuccessWithUser(userID, "Liste des abonnements récupérée avec succès dans GetUserSubscriptions")
-	c.JSON(http.StatusOK, subscriptions)
+	c.JSON(http.StatusOK, simplifiedSubscriptions)
 }
 
 // GetSubscriptionDetail returns the details of a subscription
