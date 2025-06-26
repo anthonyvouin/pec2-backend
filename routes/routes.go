@@ -33,6 +33,7 @@ func SetupRouter() *gin.Engine {
 	PrivateMessagesRoutes(r)
 	StripeRoutes(r)
 	UserSettingsRoutes(r)
+	LikesRoutes(r)
 
 	return r
 }
