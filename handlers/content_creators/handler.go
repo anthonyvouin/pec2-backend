@@ -432,6 +432,18 @@ func UpdateContentCreatorStatus(c *gin.Context) {
 	})
 }
 
+// @Summary Get general statistiques
+// @Description statistic for followers and subscribers for one creator
+// @Tags content-creators
+// @Accept json
+// @Produce json
+// @Param isSubscriberSearch query bool true "subscribers stats?"
+// @Security BearerAuth
+// @Success 200 {object} map[string]interface{} "Statistics successfully retrieved"
+// @Failure 401 {object} map[string]string "User not authenticated"
+// @Failure 404 {object} map[string]string "User not found"
+// @Failure 500 {object} map[string]string "Internal server error"
+// @Router /content-creators/stats/creator [get]
 func GetCreatorStats(c *gin.Context) {
 	isSubscriberSearchStr := c.Query("isSubscriberSearch")
 	isSubscriberSearch, err := strconv.ParseBool(isSubscriberSearchStr)
@@ -453,12 +465,18 @@ func GetCreatorStats(c *gin.Context) {
 	subscribersOrFollowers := getSubscribersOrFollowers(userID, isSubscriberSearch)
 	agePercents := getSubscriberAge(subscribersOrFollowers)
 	genderPercents := getSubscriberGender(subscribersOrFollowers)
+	mostLikedPost := getMostLikedPost(userID, isSubscriberSearch)
+	mostCommentedPost := getMostCommentsPost(userID, isSubscriberSearch)
+	threeLastPosts := getThreeLastPost(userID, isSubscriberSearch)
 
 	c.JSON(http.StatusOK, gin.H{
 		"subscribersOrFollowers": subscribersOrFollowers,
 		"subscriberLength":       len(subscribersOrFollowers),
 		"gender":                 genderPercents,
 		"subscriberAge":          agePercents,
+		"mostLikedPost":          mostLikedPost,
+		"mostCommentedPost":      mostCommentedPost,
+		"threeLastPost":          threeLastPosts,
 	})
 
 }
@@ -611,4 +629,141 @@ func getSearchFollowersUser(usersList []models.UserFollow) []models.LiteUser {
 		}
 	}
 	return followers
+}
+
+func getMostLikedPost(userID any, isSubscriberSearch bool) models.MostLikedPost {
+
+	var mostLikedPost models.MostLikedPost
+
+	errPost := db.DB.
+		Table("posts").
+		Select("posts.name, posts.picture_url, posts.description, COUNT(likes.id) AS like_count").
+		Joins("LEFT JOIN likes ON likes.post_id = posts.id").
+		Where("posts.user_id = ? AND posts.is_free = ?", userID, !isSubscriberSearch).
+		Group("posts.id").
+		Order("like_count DESC").
+		Limit(1).
+		Scan(&mostLikedPost).Error
+
+	if errPost != nil {
+		utils.LogError(errPost, "Error when get most liked post")
+	}
+
+	return mostLikedPost
+}
+
+func getMostCommentsPost(userID any, isSubscriberSearch bool) models.MostCommentPost {
+
+	var mostCommentedPost models.MostCommentPost
+
+	errPost := db.DB.
+		Table("posts").
+		Select("posts.name, posts.picture_url, posts.description, COUNT(comments.id) AS comment_count").
+		Joins("LEFT JOIN comments ON comments.post_id = posts.id::text").
+		Where("posts.user_id::text = ? AND posts.is_free = ?", userID, !isSubscriberSearch).
+		Group("posts.id").
+		Order("comment_count DESC").
+		Limit(1).
+		Scan(&mostCommentedPost).Error
+
+	if errPost != nil {
+		utils.LogError(errPost, "Error when getting most commented post")
+	}
+
+	return mostCommentedPost
+}
+
+func getThreeLastPost(userID any, isSubscriberSearch bool) []models.LastPost {
+	var lastPosts []models.LastPost
+
+	err := db.DB.
+		Table("posts").
+		Select("name, picture_url").
+		Where("user_id = ? AND is_free = ?", userID, !isSubscriberSearch).
+		Order("created_at DESC").
+		Limit(3).
+		Scan(&lastPosts).Error
+
+	if err != nil {
+		utils.LogError(err, "Erreur lors de la récupération des derniers posts")
+	}
+
+	return lastPosts
+}
+
+func GetAdvencedStats(c *gin.Context) {
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+
+	startStr := c.Query("start")
+	endStr := c.Query("end")
+
+	start, errStart := time.Parse("2006-01-02", startStr)
+	end, errEnd := time.Parse("2006-01-02", endStr)
+
+	if errStart != nil || errEnd != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid date format. Use YYYY-MM-DD"})
+		return
+	}
+
+	dateFormat := "YYYY-MM-DD"
+	isGroupedByMonth := false
+
+	if end.Sub(start).Hours() > 31*24 {
+		dateFormat = "YYYY-MM"
+		isGroupedByMonth = true
+	}
+
+	var rawResults []struct {
+		Period string
+		Total  int64
+	}
+
+	err := db.DB.
+		Table("subscription_payments").
+		Select("TO_CHAR(subscription_payments.created_at, ?) AS period, SUM(subscription_payments.amount) AS total", dateFormat).
+		Joins("JOIN subscriptions ON subscriptions.id = subscription_payments.subscription_id").
+		Where("subscriptions.content_creator_id = ? AND subscription_payments.created_at BETWEEN ? AND ?", userID, start, end).
+		Group("period").
+		Order("period").
+		Scan(&rawResults).Error
+
+	if err != nil {
+		utils.LogError(err, "Error while fetching advanced stats")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch advanced stats"})
+		return
+	}
+
+	// Convert rawResults to a map for easier lookup
+	revenueMap := make(map[string]float64)
+	for _, r := range rawResults {
+		revenueMap[r.Period] = float64(r.Total) / 100.0
+	}
+
+	var results []models.MonthlyRevenue
+	current := start
+
+	for !current.After(end) {
+		var label string
+		if isGroupedByMonth {
+			label = current.Format("2006-01")
+			current = current.AddDate(0, 1, 0)
+		} else {
+			label = current.Format("2006-01-02")
+			current = current.AddDate(0, 0, 1)
+		}
+
+		total := revenueMap[label]
+		results = append(results, models.MonthlyRevenue{
+			Month: label,
+			Total: total,
+		})
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"monthlyRevenue": results,
+	})
 }
