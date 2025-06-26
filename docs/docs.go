@@ -2265,47 +2265,6 @@ const docTemplate = `{
                 }
             }
         },
-        "/subscriptions": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Return all the subscriptions (active, canceled, history) of the connected user",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "subscriptions"
-                ],
-                "summary": "List the user's subscriptions",
-                "responses": {
-                    "200": {
-                        "description": "List of simplified subscriptions",
-                        "schema": {
-                            "type": "array",
-                            "items": {
-                                "type": "object",
-                                "additionalProperties": true
-                            }
-                        }
-                    },
-                    "401": {
-                        "description": "error: Unauthorized",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    }
-                }
-            }
-        },
         "/subscriptions/checkout/{contentCreatorId}": {
             "post": {
                 "security": [
@@ -2512,6 +2471,47 @@ const docTemplate = `{
                     },
                     "500": {
                         "description": "error: Server error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/subscriptions/user": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Return all the subscriptions (active, canceled, history) of the connected user",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "subscriptions"
+                ],
+                "summary": "List the user's subscriptions",
+                "responses": {
+                    "200": {
+                        "description": "List of simplified subscriptions",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "additionalProperties": true
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "error: Unauthorized",
                         "schema": {
                             "type": "object",
                             "additionalProperties": {

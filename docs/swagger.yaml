@@ -2072,33 +2072,6 @@ paths:
       summary: Create a new user
       tags:
       - auth
-  /subscriptions:
-    get:
-      consumes:
-      - application/json
-      description: Return all the subscriptions (active, canceled, history) of the
-        connected user
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: List of simplified subscriptions
-          schema:
-            items:
-              additionalProperties: true
-              type: object
-            type: array
-        "401":
-          description: 'error: Unauthorized'
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-      security:
-      - BearerAuth: []
-      summary: List the user's subscriptions
-      tags:
-      - subscriptions
   /subscriptions/{creatorId}:
     delete:
       consumes:
@@ -2333,6 +2306,33 @@ paths:
       security:
       - BearerAuth: []
       summary: Get top 3 content creators by active subscriptions
+      tags:
+      - subscriptions
+  /subscriptions/user:
+    get:
+      consumes:
+      - application/json
+      description: Return all the subscriptions (active, canceled, history) of the
+        connected user
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of simplified subscriptions
+          schema:
+            items:
+              additionalProperties: true
+              type: object
+            type: array
+        "401":
+          description: 'error: Unauthorized'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List the user's subscriptions
       tags:
       - subscriptions
   /user-settings:

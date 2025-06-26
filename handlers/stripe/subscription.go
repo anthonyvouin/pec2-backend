@@ -215,7 +215,7 @@ func CancelSubscription(c *gin.Context) {
 // @Security BearerAuth
 // @Success 200 {array} map[string]interface{} "List of simplified subscriptions"
 // @Failure 401 {object} map[string]string "error: Unauthorized"
-// @Router /subscriptions [get]
+// @Router /subscriptions/user [get]
 func GetUserSubscriptions(c *gin.Context) {
 	userID, exists := c.Get("user_id")
 	if !exists {
