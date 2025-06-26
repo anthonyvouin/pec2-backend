@@ -2,6 +2,7 @@ package users
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"pec2-backend/db"
 	"pec2-backend/models"
@@ -46,8 +47,18 @@ type PasswordResetConfirm struct {
 // @Failure 500 {object} map[string]string "error: error message"
 // @Router /users [get]
 func GetAllUsers(c *gin.Context) {
+
+	query := db.DB.Model(&models.User{})
+
+	search := c.Query("search")
+	if search != "" {
+		searchPattern := fmt.Sprintf("%%%s%%", search) // Format pour LIKE
+		query = query.Where("user_name LIKE ? OR first_name LIKE ? OR last_name LIKE ?",
+			searchPattern, searchPattern, searchPattern).
+			Limit(20)
+	}
 	var users []models.User
-	result := db.DB.Order("created_at DESC").Find(&users)
+	result := query.Order("created_at DESC").Find(&users)
 
 	if result.Error != nil {
 		utils.LogError(result.Error, "Error when retrieving all users in GetAllUsers")
