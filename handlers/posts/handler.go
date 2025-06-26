@@ -187,7 +187,8 @@ func GetAllPosts(c *gin.Context) {
 	if c.Query("subscriptionFeed") == "true" && exists {
 		utils.LogSuccess("Filtering by subscriptions for user: " + userID.(string))
 		var subscriptions []models.Subscription
-		if err := db.DB.Where("user_id = ? AND status = ?", userID, models.SubscriptionActive).Find(&subscriptions).Error; err != nil {
+		if err := db.DB.Where("user_id = ? AND (status = ? OR end_date > ?)", 
+			userID, models.SubscriptionActive, time.Now()).Find(&subscriptions).Error; err != nil {
 			utils.LogError(err, "Error finding user subscriptions in GetAllPosts")
 		}
 
