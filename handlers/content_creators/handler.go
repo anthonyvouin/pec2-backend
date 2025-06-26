@@ -717,6 +717,16 @@ func GetAdvencedStats(c *gin.Context) {
 		isGroupedByMonth = true
 	}
 
+	paymentResult := getPaymentsStats(userID, start, end, dateFormat, isGroupedByMonth)
+	subscriptionResult := getSubscriptionCounts(userID, start, end, dateFormat, isGroupedByMonth)
+
+	c.JSON(http.StatusOK, gin.H{
+		"monthlyRevenue": paymentResult,
+		"subscriptions":  subscriptionResult,
+	})
+}
+
+func getPaymentsStats(userID any, start time.Time, end time.Time, dateFormat string, isGroupedByMonth bool) []models.MonthlyRevenue {
 	var rawResults []struct {
 		Period string
 		Total  int64
@@ -733,8 +743,7 @@ func GetAdvencedStats(c *gin.Context) {
 
 	if err != nil {
 		utils.LogError(err, "Error while fetching advanced stats")
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch advanced stats"})
-		return
+		return nil
 	}
 
 	// Convert rawResults to a map for easier lookup
@@ -763,7 +772,51 @@ func GetAdvencedStats(c *gin.Context) {
 		})
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"monthlyRevenue": results,
-	})
+	return results
+}
+func getSubscriptionCounts(userID any, start time.Time, end time.Time, dateFormat string, isGroupedByMonth bool) []models.MonthlyRevenue {
+	var rawResults []struct {
+		Period string
+		Count  int64
+	}
+
+	err := db.DB.
+		Table("subscriptions").
+		Select("TO_CHAR(created_at, ?) AS period, COUNT(*) AS count", dateFormat).
+		Where("content_creator_id = ? AND created_at BETWEEN ? AND ?", userID, start, end).
+		Group("period").
+		Order("period").
+		Scan(&rawResults).Error
+
+	if err != nil {
+		utils.LogError(err, "Error while fetching subscription counts")
+		return nil
+	}
+
+	subscriptionMap := make(map[string]float64)
+	for _, r := range rawResults {
+		subscriptionMap[r.Period] = float64(r.Count)
+	}
+
+	var results []models.MonthlyRevenue
+	current := start
+
+	for !current.After(end) {
+		var label string
+		if isGroupedByMonth {
+			label = current.Format("2006-01")
+			current = current.AddDate(0, 1, 0)
+		} else {
+			label = current.Format("2006-01-02")
+			current = current.AddDate(0, 0, 1)
+		}
+
+		count := subscriptionMap[label]
+		results = append(results, models.MonthlyRevenue{
+			Month: label,
+			Total: count, // On réutilise Total pour stocker le count
+		})
+	}
+
+	return results
 }
