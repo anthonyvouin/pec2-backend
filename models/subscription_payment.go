@@ -25,6 +25,6 @@ const (
 )
 
 type MonthlyRevenue struct {
-	Month string  `json:"month"` // Format: YYYY-MM
-	Total float64 `json:"total"` // En euros
+	Month string  `json:"month"`
+	Total float64 `json:"total"`
 }

@@ -334,10 +334,26 @@ func Login(c *gin.Context) {
 		}
 	}
 
+	lightUser := models.UserLogin{
+		ID:                 user.ID,
+		UserName:           user.UserName,
+		Email:              user.Email,
+		Role:               user.Role,
+		Bio:                user.Bio,
+		ProfilePicture:     user.ProfilePicture,
+		FirstName:          user.FirstName,
+		LastName:           user.LastName,
+		BirthDayDate:       user.BirthDayDate,
+		Sexe:               user.Sexe,
+		CommentsEnable:     user.CommentsEnable,
+		MessageEnable:      user.MessageEnable,
+		SubscriptionEnable: user.SubscriptionEnable,
+	}
+
 	utils.LogSuccessWithUser(userID, "User login successfully in Login")
 	c.JSON(http.StatusOK, gin.H{
 		"token":     token,
-		"user":      user,
+		"user":      lightUser,
 		"following": followingIds,
 	})
 }

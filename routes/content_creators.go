@@ -20,5 +20,6 @@ func ContentCreatorsRoutes(r *gin.Engine) {
 		contentCreatorRoutes.PUT("/:id/status", middleware.AdminAuth(), content_creators.UpdateContentCreatorStatus)
 		contentCreatorRoutes.GET("/stats-general/creator", content_creators.GetCreatorStats)
 		contentCreatorRoutes.GET("/stats-advenced/creator", content_creators.GetAdvencedStats)
+		contentCreatorRoutes.GET("", content_creators.GetCreatorInscription)
 	}
 }

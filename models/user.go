@@ -47,6 +47,22 @@ type User struct {
 	ResetPasswordCodeEnd time.Time  `json:"resetPasswordCodeEnd"`
 }
 
+type UserLogin struct {
+	ID                 string    `json:"id"`
+	Email              string    `json:"email"`
+	UserName           string    `json:"userName"`
+	Role               Role      `json:"role"`
+	Bio                string    `json:"bio"`
+	ProfilePicture     string    `json:"profilePicture"`
+	FirstName          string    `json:"firstName"`
+	LastName           string    `json:"lastName"`
+	BirthDayDate       time.Time `json:"birthDayDate"`
+	Sexe               Sexe      `json:"sexe"`
+	CommentsEnable     bool      `json:"commentsEnable"`
+	MessageEnable      bool      `json:"messageEnable"`
+	SubscriptionEnable bool      `json:"subscriptionEnable"`
+}
+
 func (User) TableName() string {
 	return "users"
 }

@@ -1,7 +1,7 @@
 package content_creators
 
 import (
-	"fmt"
+	"errors"
 	"net/http"
 	"pec2-backend/db"
 	"pec2-backend/models"
@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 // @Summary Apply to become a content creator
@@ -174,7 +175,6 @@ func Apply(c *gin.Context) {
 // @Param country formData string true "Country" default(France)
 // @Param iban formData string true "IBAN" default(FR7630006000011234567890189)
 // @Param bic formData string true "BIC" default(BNPAFRPP)
-// @Param file formData file true "Document proof (PDF, image)"
 // @Success 200 {object} map[string]interface{} "message: Application updated successfully"
 // @Failure 400 {object} map[string]interface{} "error: Invalid input"
 // @Failure 404 {object} map[string]interface{} "error: No application found"
@@ -242,29 +242,29 @@ func UpdateContentCreatorInfo(c *gin.Context) {
 		return
 	}
 
-	file, err := c.FormFile("file")
-	if err != nil || file == nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Document proof is required",
-		})
-		return
-	}
+	// file, err := c.FormFile("file")
+	// if err != nil || file == nil {
+	// 	c.JSON(http.StatusBadRequest, gin.H{
+	// 		"error": "Document proof is required",
+	// 	})
+	// 	return
+	// }
 
-	oldDocumentURL := existingApplication.DocumentProofUrl
+	// oldDocumentURL := existingApplication.DocumentProofUrl
 
-	documentURL, err := utils.UploadImage(file, "content_creator_documents", "document")
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Error uploading document: " + err.Error(),
-		})
-		return
-	}
+	// documentURL, err := utils.UploadImage(file, "content_creator_documents", "document")
+	// if err != nil {
+	// 	c.JSON(http.StatusInternalServerError, gin.H{
+	// 		"error": "Error uploading document: " + err.Error(),
+	// 	})
+	// 	return
+	// }
 
-	if oldDocumentURL != "" {
-		if err := utils.DeleteImage(oldDocumentURL); err != nil {
-			fmt.Printf("Error deleting old document: %v\n", err)
-		}
-	}
+	// if oldDocumentURL != "" {
+	// 	if err := utils.DeleteImage(oldDocumentURL); err != nil {
+	// 		fmt.Printf("Error deleting old document: %v\n", err)
+	// 	}
+	// }
 
 	previousStatus := existingApplication.Status
 
@@ -278,7 +278,7 @@ func UpdateContentCreatorInfo(c *gin.Context) {
 	existingApplication.Country = contentCreatorInfoCreate.Country
 	existingApplication.Iban = contentCreatorInfoCreate.Iban
 	existingApplication.Bic = contentCreatorInfoCreate.Bic
-	existingApplication.DocumentProofUrl = documentURL
+	// existingApplication.DocumentProofUrl = documentURL
 
 	if previousStatus == models.ContentCreatorStatusRejected {
 		existingApplication.Status = models.ContentCreatorStatusPending
@@ -691,6 +691,19 @@ func getThreeLastPost(userID any, isSubscriberSearch bool) []models.LastPost {
 	return lastPosts
 }
 
+// @Summary Get advenced statistiques
+// @Description statistic for turnover and count subscribers per date
+// @Tags content-creators
+// @Accept json
+// @Produce json
+// @Param start query string true "start period"
+// @Param end query string true "end period"
+// @Security BearerAuth
+// @Success 200 {object} map[string]interface{} "Statistics successfully retrieved"
+// @Failure 401 {object} map[string]string "User not authenticated"
+// @Failure 404 {object} map[string]string "User not found"
+// @Failure 500 {object} map[string]string "Internal server error"
+// @Router /content-creators/stats-advenced/creator [get]
 func GetAdvencedStats(c *gin.Context) {
 	userID, exists := c.Get("user_id")
 	if !exists {
@@ -774,6 +787,7 @@ func getPaymentsStats(userID any, start time.Time, end time.Time, dateFormat str
 
 	return results
 }
+
 func getSubscriptionCounts(userID any, start time.Time, end time.Time, dateFormat string, isGroupedByMonth bool) []models.MonthlyRevenue {
 	var rawResults []struct {
 		Period string
@@ -814,9 +828,44 @@ func getSubscriptionCounts(userID any, start time.Time, end time.Time, dateForma
 		count := subscriptionMap[label]
 		results = append(results, models.MonthlyRevenue{
 			Month: label,
-			Total: count, // On réutilise Total pour stocker le count
+			Total: count,
 		})
 	}
 
 	return results
+}
+
+// @Summary Get creator inscription
+// @Description Get creator inscription
+// @Tags content-creators
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} map[string]interface{} "creator inscription or null"
+// @Failure 401 {object} map[string]string "User not authenticated"
+// @Failure 500 {object} map[string]string "Internal server error"
+// @Router /content-creators [get]
+func GetCreatorInscription(c *gin.Context) {
+	userID, exists := c.Get("user_id")
+	if !exists {
+		utils.LogError(errors.New("user not auth"), "User not auth")
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not auth"})
+		return
+	}
+
+	var creatorInfo models.ContentCreatorInfo
+	err := db.DB.Where("user_id = ?", userID).First(&creatorInfo).Error
+
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			c.JSON(http.StatusOK, nil)
+			return
+		}
+		// Erreur DB autre
+		utils.LogError(err, "Error when getting inscription")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error when getting inscription"})
+		return
+	}
+
+	c.JSON(http.StatusOK, creatorInfo)
 }
