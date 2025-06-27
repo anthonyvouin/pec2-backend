@@ -884,6 +884,35 @@ paths:
       tags:
       - contacts
   /content-creators:
+    get:
+      consumes:
+      - application/json
+      description: Get creator inscription
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: creator inscription or null
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: User not authenticated
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal server error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get creator inscription
+      tags:
+      - content-creators
     post:
       consumes:
       - multipart/form-data
@@ -1181,6 +1210,95 @@ paths:
       security:
       - BearerAuth: []
       summary: Get all content creator applications (Admin)
+      tags:
+      - content-creators
+  /content-creators/stats-advenced/creator:
+    get:
+      consumes:
+      - application/json
+      description: statistic for turnover and count subscribers per date
+      parameters:
+      - description: start period
+        in: query
+        name: start
+        required: true
+        type: string
+      - description: end period
+        in: query
+        name: end
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Statistics successfully retrieved
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: User not authenticated
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: User not found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal server error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get advenced statistiques
+      tags:
+      - content-creators
+  /content-creators/stats/creator:
+    get:
+      consumes:
+      - application/json
+      description: statistic for followers and subscribers for one creator
+      parameters:
+      - description: subscribers stats?
+        in: query
+        name: isSubscriberSearch
+        required: true
+        type: boolean
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Statistics successfully retrieved
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: User not authenticated
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: User not found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal server error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get general statistiques
       tags:
       - content-creators
   /insee/{siret}:

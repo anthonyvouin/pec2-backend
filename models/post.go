@@ -21,6 +21,25 @@ type Post struct {
 	DeletedAt   *time.Time `json:"deletedAt,omitempty" gorm:"index"`
 }
 
+type MostLikedPost struct {
+	Name        string `json:"name"`
+	PictureURL  string `json:"pictureUrl"`
+	Description string `json:"description"`
+	LikeCount   int    `json:"likeCount"`
+}
+
+type MostCommentPost struct {
+	Name         string `json:"name"`
+	PictureURL   string `json:"pictureUrl"`
+	Description  string `json:"description"`
+	CommentCount int    `json:"commentCount"`
+}
+
+type LastPost struct {
+	Name       string `json:"name"`
+	PictureURL string `json:"pictureUrl"`
+}
+
 type PostCreate struct {
 	Name        string   `json:"name" binding:"required"`
 	Description string   `json:"description"`
@@ -34,7 +53,7 @@ type PostUpdate struct {
 	Description string   `json:"description"`
 	IsFree      bool     `json:"isFree"`
 	Categories  []string `json:"categories"`
-	Enable      *bool     `json:"enable"`
+	Enable      *bool    `json:"enable"`
 }
 
 type PostResponse struct {

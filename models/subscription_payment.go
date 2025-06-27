@@ -23,3 +23,8 @@ const (
 	SubscriptionPaymentFailed    SubscriptionPaymentStatus = "FAILED"
 	SubscriptionPaymentCanceled  SubscriptionPaymentStatus = "CANCELED"
 )
+
+type MonthlyRevenue struct {
+	Month string  `json:"month"`
+	Total float64 `json:"total"`
+}

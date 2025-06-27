@@ -47,14 +47,32 @@ type User struct {
 	ResetPasswordCodeEnd time.Time  `json:"resetPasswordCodeEnd"`
 }
 
+type UserLogin struct {
+	ID                 string    `json:"id"`
+	Email              string    `json:"email"`
+	UserName           string    `json:"userName"`
+	Role               Role      `json:"role"`
+	Bio                string    `json:"bio"`
+	ProfilePicture     string    `json:"profilePicture"`
+	FirstName          string    `json:"firstName"`
+	LastName           string    `json:"lastName"`
+	BirthDayDate       time.Time `json:"birthDayDate"`
+	Sexe               Sexe      `json:"sexe"`
+	CommentsEnable     bool      `json:"commentsEnable"`
+	MessageEnable      bool      `json:"messageEnable"`
+	SubscriptionEnable bool      `json:"subscriptionEnable"`
+}
+
 func (User) TableName() string {
 	return "users"
 }
 
 type LiteUser struct {
-	ID             string `json:"id"`
-	UserName       string `json:"username"`
-	ProfilePicture string `json:"profile_picture"`
+	ID             string    `json:"id"`
+	UserName       string    `json:"username"`
+	ProfilePicture string    `json:"profile_picture"`
+	BirthDayDate   time.Time `json:"birthDayDate"`
+	Sexe           Sexe      `json:"sexe"`
 }
 
 // UserCreate model for create a user
@@ -89,7 +107,9 @@ type UserUpdateFormData struct {
 type UserFollow struct {
 	ID         string    `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
 	FollowerID string    `gorm:"type:uuid;not null" json:"followerId"`
+	Follower   User      `gorm:"foreignKey:FollowerID;references:ID" json:"follower"`
 	FollowedID string    `gorm:"type:uuid;not null" json:"followedId"`
+	Followed   User      `gorm:"foreignKey:FollowedID;references:ID" json:"followed"`
 	CreatedAt  time.Time `gorm:"autoCreateTime" json:"createdAt"`
 }
 
