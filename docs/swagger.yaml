@@ -281,6 +281,8 @@ definitions:
         type: string
       isFree:
         type: boolean
+      isLikedByUser:
+        type: boolean
       likesCount:
         type: integer
       messageEnabled:
@@ -1074,11 +1076,6 @@ paths:
         name: bic
         required: true
         type: string
-      - description: Document proof (PDF, image)
-        in: formData
-        name: file
-        required: true
-        type: file
       produces:
       - application/json
       responses:

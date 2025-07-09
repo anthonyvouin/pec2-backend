@@ -286,6 +286,14 @@ func GetAllPosts(c *gin.Context) {
 		var reportsCount int64
 		db.DB.Model(&models.Report{}).Where("post_id = ?", post.ID).Count(&reportsCount)
 
+		// Vérifier si l'utilisateur actuel a liké ce post
+		var isLikedByUser bool
+		if exists && userID != nil {
+			var likeCount int64
+			db.DB.Model(&models.Like{}).Where("post_id = ? AND user_id = ?", post.ID, userID).Count(&likeCount)
+			isLikedByUser = likeCount > 0
+		}
+
 		// Créer la réponse pour ce post
 		postResponse := models.PostResponse{
 			ID: post.ID, Name: post.Name, Description: post.Description, PictureURL: post.PictureURL,
@@ -304,6 +312,7 @@ func GetAllPosts(c *gin.Context) {
 			ReportsCount:   int(reportsCount),
 			CommentEnabled: post.User.CommentsEnable,
 			MessageEnabled: post.User.MessageEnable,
+			IsLikedByUser:  isLikedByUser,
 		}
 
 		response = append(response, postResponse)
@@ -398,6 +407,14 @@ func GetPostByID(c *gin.Context) {
 	var reportsCount int64
 	db.DB.Model(&models.Report{}).Where("post_id = ?", post.ID).Count(&reportsCount)
 
+	// Vérifier si l'utilisateur actuel a liké ce post
+	var isLikedByUser bool
+	if exists && userID != nil {
+		var likeCount int64
+		db.DB.Model(&models.Like{}).Where("post_id = ? AND user_id = ?", post.ID, userID).Count(&likeCount)
+		isLikedByUser = likeCount > 0
+	}
+
 	// Créer la réponse pour ce post
 	postResponse := models.PostResponse{
 		ID: post.ID, Name: post.Name, Description: post.Description, PictureURL: post.PictureURL,
@@ -416,6 +433,7 @@ func GetPostByID(c *gin.Context) {
 		ReportsCount:   int(reportsCount),
 		CommentEnabled: post.User.CommentsEnable,
 		MessageEnabled: post.User.MessageEnable,
+		IsLikedByUser:  isLikedByUser,
 	}
 
 	utils.LogSuccess("Post retrieved successfully in GetPostByID")

@@ -613,13 +613,6 @@ const docTemplate = `{
                         "name": "bic",
                         "in": "formData",
                         "required": true
-                    },
-                    {
-                        "type": "file",
-                        "description": "Document proof (PDF, image)",
-                        "name": "file",
-                        "in": "formData",
-                        "required": true
                     }
                 ],
                 "responses": {
@@ -4386,6 +4379,9 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "isFree": {
+                    "type": "boolean"
+                },
+                "isLikedByUser": {
                     "type": "boolean"
                 },
                 "likesCount": {
